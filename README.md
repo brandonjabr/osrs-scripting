@@ -2,8 +2,8 @@
 
 A portfolio of automation scripts for Old School RuneScape, written as plugins for the open-source
 [Microbot](https://github.com/chsami/Microbot) client (a fork of [RuneLite](https://github.com/runelite/runelite)).
-There are 15 scripts in all, 14 of them under the **Shadowfax** name, plus a shared framework they're built on: about
-35,000 lines of Java.
+There are 15 scripts, all under the **Shadowfax** name, plus a shared framework they're built on: about 35,000
+lines of Java.
 
 > **Disclaimer: for educational purposes only.**
 > This repository exists to show software design work: state machines, planning under uncertainty, recovery from
@@ -48,7 +48,7 @@ There are 15 scripts in all, 14 of them under the **Shadowfax** name, plus a sha
 | [Shadowfax Magic Trainer](#shadowfax-magic-trainer) | Splashes curses on the Varrock monk, buying runes as it goes |
 | [Shadowfax Bolt Enchanter](#shadowfax-bolt-enchanter) | Enchants crossbow bolts until they're gone |
 | [Shadowfax Walker](#shadowfax-walker) | A search-as-you-type travel picker on top of the web walker |
-| [Cow Killer](#cow-killer) | The first script: cows, cooking, and scimitar upgrades paid for with cowhides |
+| [Shadowfax Account Starter](#shadowfax-account-starter) | Starts a fresh account on the Lumbridge cows, with scimitar upgrades paid for in cowhides |
 
 ### Shadowfax Questing
 `scripts/shadowfaxquesting` · 16 files, ~4,800 lines
@@ -181,11 +181,17 @@ bolts or runes run out.
 A destination picker with search-as-you-type over common places, on top of Microbot's web walker. A hotkey reopens
 the picker mid-walk to change course.
 
-### Cow Killer
-`scripts/cowkiller` · 5 files, ~1,400 lines
+### Shadowfax Account Starter
+`scripts/shadowfaxaccountstarter` · 5 files, ~1,500 lines
 
-The first script, before the Shadowfax naming. It kills cows, cooks beef when health runs low, banks cowhides, and
-every few Attack levels sells the hides to buy the next scimitar from Zeke.
+Takes a brand-new account through its first combat levels on the cows east of Lumbridge.
+- **Food:** gathers raw beef and cooks it in the Lumbridge castle kitchen when health runs low, so it needs no
+  supplies to start.
+- **Money:** banks the cowhides, and every few Attack levels sells them on the Grand Exchange to buy the next
+  scimitar from Zeke in Al Kharid. It knows the GE is locked below 100 total level and keeps collecting hides until
+  then.
+- **Safety:** a watchdog re-targets a stalled fight and resets a stalled walk, and StuckGuard stops it after 90
+  seconds with no progress.
 
 ## Shared framework
 

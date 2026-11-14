@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.cowkiller;
+package net.runelite.client.plugins.microbot.shadowfaxaccountstarter;
 
 import net.runelite.api.Client;
 import net.runelite.api.Experience;
@@ -27,9 +27,9 @@ import java.util.List;
  * Stats card drawn straight with Graphics2D: header with live state, a grid of session tiles,
  * per-skill xp rows with progress to the next level, and the upcoming scimitar.
  */
-public class CowKillerOverlay extends Overlay {
+public class AccountStarterOverlay extends Overlay {
 
-    private static final int WIDTH = 240;
+    private static final int WIDTH = 250;
     private static final int PAD = 12;
     private static final int GAP = 6;
     private static final int HEADER_H = 40;
@@ -49,13 +49,13 @@ public class CowKillerOverlay extends Overlay {
     private static final Color SHADOW = new Color(0, 0, 0, 160);
 
     private final Client client;
-    private final CowKillerConfig config;
-    private final CowKillerStats stats;
-    private final CowKillerScript script;
+    private final AccountStarterConfig config;
+    private final AccountStarterStats stats;
+    private final AccountStarterScript script;
 
     @Inject
-    CowKillerOverlay(CowKillerPlugin plugin, Client client, CowKillerConfig config,
-                     CowKillerStats stats, CowKillerScript script) {
+    AccountStarterOverlay(AccountStarterPlugin plugin, Client client, AccountStarterConfig config,
+                     AccountStarterStats stats, AccountStarterScript script) {
         super(plugin);
         this.client = client;
         this.config = config;
@@ -75,8 +75,8 @@ public class CowKillerOverlay extends Overlay {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         List<SkillLine> skills = skillLines();
-        int tileRows = 2;
-        int footerLines = stats.lastUpgrade() != null ? 2 : 1;
+        int tileRows = 3;
+        int footerLines = stats.lastUpgrade() != null ? 3 : 2;
         int height = PAD + HEADER_H
                 + tileRows * (TILE_H + GAP)
                 + SECTION_H + Math.max(1, skills.size()) * SKILL_ROW_H
@@ -110,15 +110,15 @@ public class CowKillerOverlay extends Overlay {
         String state = currentState();
         boolean fighting = "FIGHT".equals(state);
 
-        // Status dot: green while fighting, amber while travelling/banking/cooking.
+        // Status dot: green while fighting, amber while travelling, banking or cooking.
         g.setColor(fighting ? ACCENT : ACCENT_2);
         g.fillOval(PAD, y + 5, 8, 8);
 
         g.setFont(FontManager.getRunescapeBoldFont());
-        text(g, "Cow Killer", PAD + 14, y + 14, TEXT);
+        text(g, "Shadowfax Account Starter", PAD + 14, y + 14, TEXT);
 
         g.setFont(FontManager.getRunescapeSmallFont());
-        String version = "v" + CowKillerPlugin.VERSION;
+        String version = "v" + AccountStarterPlugin.VERSION;
         textRight(g, version, WIDTH - PAD, y + 13, MUTED);
 
         String status = Microbot.status != null ? Microbot.status : "";
@@ -137,9 +137,12 @@ public class CowKillerOverlay extends Overlay {
                 {"RUNTIME", formatDuration(stats.runtime())},
                 {"COWS", formatNumber(stats.cowsKilled())},
                 {"COWS / HR", formatNumber(stats.perHour(stats.cowsKilled()))},
-                {"HIDES BANKED", formatNumber(stats.hidesBanked())},
-                {"LEVELS", "+" + totalLevelsGained()},
+                {"XP GAINED", formatNumber(xpGained)},
                 {"XP / HR", formatNumber(stats.perHour(xpGained))},
+                {"LEVELS", "+" + totalLevelsGained()},
+                {"HIDES BANKED", formatNumber(stats.hidesBanked())},
+                {"HIDES / HR", formatNumber(stats.perHour(stats.hidesBanked()))},
+                {"BANK TRIPS", formatNumber(stats.bankTrips())},
         };
 
         for (int i = 0; i < tiles.length; i++) {
@@ -149,7 +152,7 @@ public class CowKillerOverlay extends Overlay {
             int ty = y + row * (TILE_H + GAP);
             drawTile(g, x, ty, tileW, tiles[i][0], tiles[i][1]);
         }
-        return y + 2 * (TILE_H + GAP);
+        return y + (tiles.length / cols) * (TILE_H + GAP);
     }
 
     private void drawTile(Graphics2D g, int x, int y, int w, String label, String value) {
@@ -209,6 +212,11 @@ public class CowKillerOverlay extends Overlay {
             text(g, "Upgrades", PAD, y + 11, MUTED);
             textRight(g, stats.upgrades() + "  ·  " + stats.lastUpgrade(), WIDTH - PAD, y + 11, TEXT);
         }
+
+        y += FOOTER_LINE_H;
+        text(g, "Cooked  " + formatNumber(stats.meatCooked()) + "  ·  Recoveries  " + stats.recoveries(),
+                PAD, y + 11, MUTED);
+        textRight(g, "Cooking  " + client.getRealSkillLevel(Skill.COOKING), WIDTH - PAD, y + 11, TEXT);
     }
 
     // --- Data ---
@@ -224,7 +232,7 @@ public class CowKillerOverlay extends Overlay {
     /** Skills that gained xp this session, in tracked order. Runs on the client thread, so client reads are safe. */
     private List<SkillLine> skillLines() {
         List<SkillLine> lines = new ArrayList<>();
-        for (Skill skill : CowKillerStats.TRACKED_SKILLS) {
+        for (Skill skill : AccountStarterStats.TRACKED_SKILLS) {
             int start = stats.startXp(skill);
             if (start < 0) continue;
             int xp = client.getSkillExperience(skill);
@@ -249,7 +257,7 @@ public class CowKillerOverlay extends Overlay {
 
     private long totalXpGained() {
         long total = 0;
-        for (Skill skill : CowKillerStats.TRACKED_SKILLS) {
+        for (Skill skill : AccountStarterStats.TRACKED_SKILLS) {
             int start = stats.startXp(skill);
             if (start >= 0) total += Math.max(0, client.getSkillExperience(skill) - start);
         }
@@ -258,7 +266,7 @@ public class CowKillerOverlay extends Overlay {
 
     private int totalLevelsGained() {
         int total = 0;
-        for (Skill skill : CowKillerStats.TRACKED_SKILLS) {
+        for (Skill skill : AccountStarterStats.TRACKED_SKILLS) {
             int start = stats.startXp(skill);
             if (start >= 0) {
                 total += Experience.getLevelForXp(client.getSkillExperience(skill)) - Experience.getLevelForXp(start);
@@ -268,7 +276,7 @@ public class CowKillerOverlay extends Overlay {
     }
 
     private String currentState() {
-        StateSnapshot<CowKillerScript.State> snapshot = script.getSnapshot();
+        StateSnapshot<AccountStarterScript.State> snapshot = script.getSnapshot();
         return snapshot != null && snapshot.currentState() != null ? snapshot.currentState().name() : "";
     }
 

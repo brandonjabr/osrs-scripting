@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.cowkiller;
+package net.runelite.client.plugins.microbot.shadowfaxaccountstarter;
 
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Written from the script and client threads, read from the overlay on the client thread.
  */
 @Singleton
-public class CowKillerStats {
+public class AccountStarterStats {
 
     static final Skill[] TRACKED_SKILLS = {Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.HITPOINTS, Skill.COOKING};
 
@@ -25,6 +25,9 @@ public class CowKillerStats {
     private final AtomicInteger cowsKilled = new AtomicInteger();
     private final AtomicInteger hidesBanked = new AtomicInteger();
     private final AtomicInteger upgrades = new AtomicInteger();
+    private final AtomicInteger meatCooked = new AtomicInteger();
+    private final AtomicInteger bankTrips = new AtomicInteger();
+    private final AtomicInteger recoveries = new AtomicInteger();
     private volatile String lastUpgrade;
     private volatile String nextUpgrade = "";
     // Null until the first logged-in tick, so xp gained isn't measured from zero.
@@ -35,6 +38,9 @@ public class CowKillerStats {
         cowsKilled.set(0);
         hidesBanked.set(0);
         upgrades.set(0);
+        meatCooked.set(0);
+        bankTrips.set(0);
+        recoveries.set(0);
         lastUpgrade = null;
         nextUpgrade = "";
         startXp = null;
@@ -64,6 +70,30 @@ public class CowKillerStats {
     void recordUpgrade(String itemName) {
         upgrades.incrementAndGet();
         lastUpgrade = itemName;
+    }
+
+    void addMeatCooked(int count) {
+        if (count > 0) meatCooked.addAndGet(count);
+    }
+
+    void addBankTrip() {
+        bankTrips.incrementAndGet();
+    }
+
+    void addRecovery() {
+        recoveries.incrementAndGet();
+    }
+
+    int meatCooked() {
+        return meatCooked.get();
+    }
+
+    int bankTrips() {
+        return bankTrips.get();
+    }
+
+    int recoveries() {
+        return recoveries.get();
     }
 
     void setNextUpgrade(String label) {

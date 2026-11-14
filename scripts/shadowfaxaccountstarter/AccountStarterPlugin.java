@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.cowkiller;
+package net.runelite.client.plugins.microbot.shadowfaxaccountstarter;
 
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
@@ -16,28 +16,29 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import javax.inject.Inject;
 
 @PluginDescriptor(
-        name = PluginDescriptor.Default + "Cow Killer",
-        description = "Kills cows in the Lumbridge pen, cooks beef for food, and upgrades scimitars from Zeke with cowhide money",
-        tags = {"cow", "combat", "lumbridge", "scimitar", "cooking", "microbot"},
-        version = CowKillerPlugin.VERSION,
+        name = PluginDescriptor.Default + "Shadowfax Account Starter",
+        description = "Starts a fresh account: trains melee on the Lumbridge cows, cooks their beef for food, and "
+                + "upgrades scimitars from Zeke with cowhide money",
+        tags = {"account", "starter", "cow", "combat", "lumbridge", "scimitar", "cooking", "microbot"},
+        version = AccountStarterPlugin.VERSION,
         enabledByDefault = false
 )
 @Slf4j
-public class CowKillerPlugin extends Plugin {
+public class AccountStarterPlugin extends Plugin {
 
-    static final String VERSION = "1.1.0";
-
-    @Inject
-    private CowKillerScript script;
+    static final String VERSION = "1.2.0";
 
     @Inject
-    private CowKillerConfig config;
+    private AccountStarterScript script;
 
     @Inject
-    private CowKillerStats stats;
+    private AccountStarterConfig config;
 
     @Inject
-    private CowKillerOverlay overlay;
+    private AccountStarterStats stats;
+
+    @Inject
+    private AccountStarterOverlay overlay;
 
     @Inject
     private OverlayManager overlayManager;
@@ -46,8 +47,8 @@ public class CowKillerPlugin extends Plugin {
     private Client client;
 
     @Provides
-    CowKillerConfig provideConfig(ConfigManager configManager) {
-        return configManager.getConfig(CowKillerConfig.class);
+    AccountStarterConfig provideConfig(ConfigManager configManager) {
+        return configManager.getConfig(AccountStarterConfig.class);
     }
 
     @Override

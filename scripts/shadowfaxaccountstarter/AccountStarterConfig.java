@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.cowkiller;
+package net.runelite.client.plugins.microbot.shadowfaxaccountstarter;
 
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
@@ -6,8 +6,10 @@ import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
 
-@ConfigGroup("cowkiller")
-public interface CowKillerConfig extends Config {
+@ConfigGroup(AccountStarterConfig.GROUP)
+public interface AccountStarterConfig extends Config {
+
+    String GROUP = "shadowfaxaccountstarter";
 
     @ConfigSection(
             name = "Food",
@@ -182,7 +184,7 @@ public interface CowKillerConfig extends Config {
     @ConfigItem(
             keyName = "showOverlay",
             name = "Show stats overlay",
-            description = "Draw the Cow Killer stats panel on screen",
+            description = "Draw the Shadowfax Account Starter stats panel on screen",
             position = 1,
             section = generalSection
     )
@@ -192,7 +194,7 @@ public interface CowKillerConfig extends Config {
 
     // Attack level at the last upgrade (or first start). Persisted so a restart doesn't reset the 10-level countdown.
     @ConfigItem(
-            keyName = CowKillerScript.LAST_UPGRADE_LEVEL_KEY,
+            keyName = AccountStarterScript.LAST_UPGRADE_LEVEL_KEY,
             name = "",
             description = "",
             hidden = true

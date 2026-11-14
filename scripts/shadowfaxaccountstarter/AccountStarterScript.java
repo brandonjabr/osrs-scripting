@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.cowkiller;
+package net.runelite.client.plugins.microbot.shadowfaxaccountstarter;
 
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.EquipmentInventorySlot;
@@ -12,6 +12,7 @@ import net.runelite.client.plugins.microbot.api.tileitem.models.Rs2TileItemModel
 import net.runelite.client.plugins.microbot.api.tileobject.models.Rs2TileObjectModel;
 import net.runelite.client.plugins.microbot.statemachine.StateMachineScript;
 import net.runelite.client.plugins.microbot.statemachine.Transition;
+import net.runelite.client.plugins.microbot.util.antiban.MouseIdleHabits;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2Antiban;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2AntibanSettings;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
@@ -26,6 +27,7 @@ import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
 import net.runelite.client.plugins.microbot.util.keyboard.Rs2Keyboard;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.player.StaminaPotions;
+import net.runelite.client.plugins.microbot.util.safety.StuckGuard;
 import net.runelite.client.plugins.microbot.util.shop.Rs2Shop;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.util.walker.WalkerState;
@@ -38,16 +40,18 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Kills cows in the pen east of Lumbridge. Gathers and cooks raw beef in the Lumbridge castle kitchen
- * when health runs low, banks cowhides at Lumbridge, and every N attack levels sells the hides on the
- * Grand Exchange to buy the next scimitar from Zeke in Al Kharid.
+ * Starts a fresh account on the cows in the pen east of Lumbridge. Gathers and cooks raw beef in the Lumbridge
+ * castle kitchen when health runs low, banks cowhides at Lumbridge, and every N attack levels sells the hides on
+ * the Grand Exchange to buy the next scimitar from Zeke in Al Kharid.
  * <p>
  * FIGHT ⇄ COOK, FIGHT → BANK → (SELL_HIDES →) BUY_SCIMITAR → WALK_TO_PEN → FIGHT.
- * Dying or wandering off from any state ends up back in WALK_TO_PEN.
+ * Dying or wandering off from any state ends up back in WALK_TO_PEN. A watchdog re-targets a stalled fight and
+ * resets a stalled walk; a state that makes no progress at all for 90 seconds trips {@link StuckGuard}, which logs
+ * out and stops the plugin.
  */
 @Slf4j
 @Singleton
-public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
+public class AccountStarterScript extends StateMachineScript<AccountStarterScript.State> {
 
     static final String LAST_UPGRADE_LEVEL_KEY = "lastUpgradeAttackLevel";
 
@@ -101,16 +105,24 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
     // Accounts below this total level are restricted from the Grand Exchange.
     private static final int GE_MIN_TOTAL_LEVEL = 100;
 
+    // Watchdog: how long a state may go without progress before each recovery step.
+    private static final long FIGHT_RETARGET_MS = 15_000;
+    private static final long WALK_RESET_MS = 20_000;
+    private static final long ANY_STATE_STUCK_MS = 90_000;
+    // Deliberate waits (respawns, regenerating health, GE offers) count as progress for this long.
+    private static final long INTENTIONAL_WAIT_GRACE_MS = 2_000;
+
     @Inject
     private ConfigManager configManager;
 
     @Inject
-    private CowKillerStats stats;
+    private AccountStarterStats stats;
 
-    private CowKillerConfig config;
+    private AccountStarterConfig config;
 
     // Per-state flags, reset on every transition.
     private BankResult bankResult = BankResult.PENDING;
+    private boolean bankTripCounted;
     private boolean sellDone;
     private boolean buyDone;
 
@@ -118,6 +130,13 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
     private boolean fundsShort;
     private int sellAttempts;
     private long offerPlacedAt;
+
+    // Watchdog state.
+    private State watchedState;
+    private long lastProgressAt;
+    private long lastIntentionalWaitAt;
+    private int recoveryLevel;
+    private String progressSignature = "";
 
     @Override
     protected State initialState() {
@@ -191,6 +210,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
     protected void onTransition(State from, State to, String reason) {
         super.onTransition(from, to, reason);
         bankResult = BankResult.PENDING;
+        bankTripCounted = false;
         sellDone = false;
         buyDone = false;
         sellAttempts = 0;
@@ -229,7 +249,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
         if (Rs2Shop.isOpen()) Rs2Shop.closeShop();
         if (Rs2GrandExchange.isOpen()) Rs2GrandExchange.closeExchange();
         if (Rs2Walker.walkWithState(COW_PEN_CENTER, 4) == WalkerState.UNREACHABLE) {
-            log.warn("[CowKiller] Cow pen unreachable from {}", Rs2Player.getWorldLocation());
+            log.warn("[AccountStarter] Cow pen unreachable from {}", Rs2Player.getWorldLocation());
         }
     }
 
@@ -264,6 +284,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
 
         if (!hasFood() && Rs2Player.getHealthPercentage() <= config.restAtPercent()) {
             Microbot.status = "Out of food, waiting for health to regenerate";
+            markIntentionalWait();
             return;
         }
 
@@ -276,6 +297,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
                 .nearestReachableOnClientThread();
         if (cow == null) {
             Microbot.status = "Waiting for cows to respawn";
+            markIntentionalWait();
             return;
         }
 
@@ -306,6 +328,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
             int left = Rs2Inventory.count(RAW_BEEF, true);
             // A level-up dialogue interrupts the batch; stop waiting so the next tick can restart it.
             sleepUntil(() -> !Rs2Inventory.hasItem(RAW_BEEF, true) || Rs2Dialogue.hasContinue(), left * 2400 + 3000);
+            stats.addMeatCooked(left - Rs2Inventory.count(RAW_BEEF, true));
             return;
         }
 
@@ -349,6 +372,10 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
             return;
         }
         stats.addHidesBanked(hides);
+        if (bankResult == BankResult.PENDING && !bankTripCounted) {
+            bankTripCounted = true;
+            stats.addBankTrip();
+        }
         if (config.useStaminas() && StaminaPotions.topUp(config.staminaCount())) {
             return;
         }
@@ -374,7 +401,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
 
         int totalLevel = totalLevel();
         if (totalLevel < GE_MIN_TOTAL_LEVEL) {
-            log.info("[CowKiller] Total level {} is below {}; the Grand Exchange is restricted. Collecting more hides.",
+            log.info("[AccountStarter] Total level {} is below {}; the Grand Exchange is restricted. Collecting more hides.",
                     totalLevel, GE_MIN_TOTAL_LEVEL);
             fundsShort = true;
             return BankResult.TO_PEN;
@@ -382,7 +409,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
 
         long estimate = coins + (long) hides * config.hidePriceEstimate();
         if (hides == 0 || estimate < needed) {
-            log.info("[CowKiller] {} needs {} coins; have {} coins and {} hides (~{}). Collecting more hides.",
+            log.info("[AccountStarter] {} needs {} coins; have {} coins and {} hides (~{}). Collecting more hides.",
                     target.itemName, needed, coins, hides, estimate);
             fundsShort = true;
             return BankResult.TO_PEN;
@@ -426,6 +453,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
                 sleepUntil(Rs2GrandExchange::isAllSlotsEmpty, 5000);
             } else {
                 Microbot.status = "Waiting for cowhides to sell";
+                markIntentionalWait();
             }
             return;
         }
@@ -450,7 +478,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
 
         Rs2GrandExchange.closeExchange();
         if (!canAffordUpgrade()) {
-            log.info("[CowKiller] Sold hides but only have {} coins", Rs2Inventory.itemQuantity(COINS, true));
+            log.info("[AccountStarter] Sold hides but only have {} coins", Rs2Inventory.itemQuantity(COINS, true));
             fundsShort = true;
         }
         sellDone = true;
@@ -471,7 +499,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
             Microbot.status = "Wielding " + target.itemName;
             Rs2Inventory.wield(target.itemName);
             if (sleepUntil(() -> target.itemName.equalsIgnoreCase(equippedWeaponName()), 3000)) {
-                log.info("[CowKiller] Upgraded to {} at attack level {}", target.itemName, attackLevel());
+                log.info("[AccountStarter] Upgraded to {} at attack level {}", target.itemName, attackLevel());
                 saveLastUpgradeLevel(attackLevel());
                 stats.recordUpgrade(target.itemName);
                 buyDone = true;
@@ -480,7 +508,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
         }
 
         if (Rs2Inventory.itemQuantity(COINS, true) < target.price) {
-            log.info("[CowKiller] Not enough coins for {}", target.itemName);
+            log.info("[AccountStarter] Not enough coins for {}", target.itemName);
             fundsShort = true;
             buyDone = true;
             return;
@@ -488,7 +516,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
 
         if (Rs2Shop.isOpen()) {
             if (!Rs2Shop.hasStock(target.itemName)) {
-                log.info("[CowKiller] Zeke is out of {}", target.itemName);
+                log.info("[AccountStarter] Zeke is out of {}", target.itemName);
                 fundsShort = true;
                 buyDone = true;
                 return;
@@ -628,25 +656,102 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
     }
 
     private void saveLastUpgradeLevel(int level) {
-        configManager.setConfiguration("cowkiller", LAST_UPGRADE_LEVEL_KEY, level);
+        configManager.setConfiguration(AccountStarterConfig.GROUP, LAST_UPGRADE_LEVEL_KEY, level);
+    }
+
+    // --- Watchdog ---
+
+    /**
+     * Keeps the state machine moving when a state stops making progress (no xp, no movement, no inventory change,
+     * and no deliberate wait). FIGHT re-targets at 15s; WALK_TO_PEN resets the walker at 20s; any state with no
+     * progress for 90s trips StuckGuard, which logs out and stops the plugin.
+     *
+     * @return true if this tick was spent on a recovery action
+     */
+    private boolean runWatchdog() {
+        State state = getCurrentState();
+        long now = System.currentTimeMillis();
+        if (state == null) return false;
+
+        String signature = progressSignature();
+        boolean progressed = !signature.equals(progressSignature)
+                || now - lastIntentionalWaitAt < INTENTIONAL_WAIT_GRACE_MS;
+        progressSignature = signature;
+        if (state != watchedState || progressed) {
+            watchedState = state;
+            lastProgressAt = now;
+            recoveryLevel = 0;
+            return false;
+        }
+
+        long idle = now - lastProgressAt;
+        if (idle >= ANY_STATE_STUCK_MS && recoveryLevel < 2) {
+            recoveryLevel = 2;
+            stats.addRecovery();
+            StuckGuard.trip("no progress in " + state + " for " + idle / 1000 + "s");
+            return true;
+        }
+        if (state == State.FIGHT && idle >= FIGHT_RETARGET_MS && recoveryLevel < 1) {
+            recoveryLevel = 1;
+            log.warn("[AccountStarter] Watchdog: no combat for {}s, re-targeting", idle / 1000);
+            Microbot.status = "Watchdog: re-targeting";
+            stats.addRecovery();
+            Rs2AntibanSettings.actionCooldownActive = false;
+            fight();
+            return true;
+        }
+        if (state == State.WALK_TO_PEN && idle >= WALK_RESET_MS && recoveryLevel < 1) {
+            recoveryLevel = 1;
+            log.warn("[AccountStarter] Watchdog: walker made no progress for {}s, resetting it", idle / 1000);
+            Microbot.status = "Watchdog: resetting the walker";
+            stats.addRecovery();
+            Rs2Walker.setTarget(null, "Account starter watchdog reset");
+            return true;
+        }
+        return false;
+    }
+
+    /** What counts as progress: xp in the tracked skills, position and inventory contents. */
+    private String progressSignature() {
+        long xp = Microbot.getClientThread().runOnClientThreadOptional(() -> {
+            long total = 0;
+            for (Skill skill : AccountStarterStats.TRACKED_SKILLS) {
+                total += Microbot.getClient().getSkillExperience(skill);
+            }
+            return total;
+        }).orElse(0L);
+        int inventory = Rs2Inventory.items().mapToInt(Rs2ItemModel::getQuantity).sum();
+        return xp + "|" + Rs2Player.getWorldLocation() + "|" + inventory;
+    }
+
+    private void markIntentionalWait() {
+        lastIntentionalWaitAt = System.currentTimeMillis();
     }
 
     // --- Lifecycle ---
 
-    public boolean run(CowKillerConfig config) {
+    public boolean run(AccountStarterConfig config) {
         this.config = config;
         fundsShort = false;
+        watchedState = null;
+        recoveryLevel = 0;
+        progressSignature = "";
         stats.reset();
 
         if (config.antiban()) {
             Rs2Antiban.resetAntibanSettings();
             Rs2Antiban.antibanSetupTemplates.applyCombatSetup();
+            MouseIdleHabits.enable();
         }
+
+        StuckGuard.attach("Shadowfax Account Starter", AccountStarterPlugin.class);
 
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
             try {
+                if (StuckGuard.isTripped()) return;
                 if (!Microbot.isLoggedIn()) return;
                 stats.captureBaselineIfNeeded();
+                if (runWatchdog()) return;
                 // First run: count the 10 levels from wherever the character is now.
                 if (config.lastUpgradeAttackLevel() == 0) {
                     saveLastUpgradeLevel(attackLevel());
@@ -663,7 +768,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
             } catch (Throwable ex) {
                 // Throwable, not Exception: an uncaught Error (e.g. a client-thread AssertionError) would otherwise
                 // cancel the scheduled task without any log line.
-                log.error("[CowKiller] Unexpected error in scheduled loop", ex);
+                log.error("[AccountStarter] Unexpected error in scheduled loop", ex);
             }
         }, 0, 600, TimeUnit.MILLISECONDS);
 
@@ -672,6 +777,7 @@ public class CowKillerScript extends StateMachineScript<CowKillerScript.State> {
 
     @Override
     public void shutdown() {
+        StuckGuard.detach(AccountStarterPlugin.class);
         super.shutdown();
         Rs2Antiban.resetAntibanSettings();
     }
