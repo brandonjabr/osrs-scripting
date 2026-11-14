@@ -1,0 +1,484 @@
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/api/npc/models/Rs2NpcModel.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/api/npc/models/Rs2NpcModel.java
+index 8e3040d0e4..8d5a183fad 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/api/npc/models/Rs2NpcModel.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/api/npc/models/Rs2NpcModel.java
+@@ -233,8 +233,12 @@ public class Rs2NpcModel extends Rs2ActorModel implements IEntity
+                 }
+             }
+ 
+-            final NPCComposition npcComposition = Microbot.getClientThread().runOnClientThreadOptional(
+-                    () -> Microbot.getClient().getNpcDefinition(getId())).orElse(null);
++            // Transforming NPCs (e.g. Lumbridge sheep) keep their options on the transformed definition; the base
++            // one has none.
++            final NPCComposition npcComposition = Microbot.getClientThread().runOnClientThreadOptional(() -> {
++                NPCComposition transformed = npc.getTransformedComposition();
++                return transformed != null ? transformed : Microbot.getClient().getNpcDefinition(getId());
++            }).orElse(null);
+             if (npcComposition == null) {
+                 log.error("Error interacting with NPC '{}' for action '{}': NPCComposition is null", npcName, action);
+                 return false;
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/QuestScript.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/QuestScript.java
+index f8597f6fa5..5936f30694 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/QuestScript.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/QuestScript.java
+@@ -64,6 +64,7 @@ import javax.swing.SwingUtilities;
+ import org.slf4j.event.Level;
+ import net.runelite.api.coords.WorldArea;
+ 
++@lombok.extern.slf4j.Slf4j
+ public class QuestScript extends Script {
+     public static double version = 0.6;
+ 
+@@ -96,6 +97,16 @@ public class QuestScript extends Script {
+ 
+     private final MultiNpcTargetTracker multiNpcTarget = new MultiNpcTargetTracker();
+ 
++    // An NPC this close that walking can't bring nearer is clicked directly (see applyNpcStep).
++    private static final int NPC_CLOSE_DISTANCE = 5;
++    private static final int NPC_STALLED_WALKS = 2;
++    private WorldPoint lastNpcWalkFrom;
++    private int npcWalksWithoutProgress;
++    // NPCs (by index) a direct click from close by couldn't reach, and when; the walker handles them meanwhile.
++    private static final long NPC_UNREACHABLE_MS = 30_000;
++    private static final int NPC_ENGAGE_WAIT_MS = 5_000;
++    private final Map<Integer, Long> unreachableNpcs = new HashMap<>();
++
+     private final AtomicReference<Thread> iterationThread = new AtomicReference<>();
+ 
+     /**
+@@ -1435,9 +1446,9 @@ public class QuestScript extends Script {
+     }
+ 
+     public boolean applyNpcStep(NpcStep step) {
+-        List<Rs2NpcModel> npcs = step.getNpcs().stream()
+-                .map(Rs2NpcModel::new)
+-                .collect(Collectors.toList());
++        // Quest Helper's tracked NPCs, or the same character by id or name when its list is empty (wrong or
++        // variant ids in the port, e.g. Priest in Peril's King Roald): without this the step stood still forever.
++        List<Rs2NpcModel> npcs = StepNpcResolver.resolve(step);
+         Rs2NpcModel npc = npcs.stream().findFirst().orElse(null);
+ 
+         if (step.isAllowMultipleHighlights()) {
+@@ -1446,10 +1457,34 @@ public class QuestScript extends Script {
+                     System.currentTimeMillis());
+         }
+ 
++        WorldPoint me = Rs2Player.getWorldLocation();
++        int npcDistance = npc == null || npc.getWorldLocation() == null || me == null ? Integer.MAX_VALUE
++                : npc.getWorldLocation().distanceTo(me);
++        boolean onScreen = npc != null && npc.getLocalLocation() != null && Rs2Camera.isTileOnScreen(npc.getLocalLocation());
++        // Right next to it but off screen: walking "within 2 tiles" does nothing, so turn the camera instead.
++        if (npc != null && !onScreen && npcDistance <= NPC_CLOSE_DISTANCE) {
++            Rs2Camera.turnTo(npc);
++            onScreen = npc.getLocalLocation() != null && Rs2Camera.isTileOnScreen(npc.getLocalLocation());
++        }
+         // canReach() pathfinds through closed doors (the walker opens them en route), so canReach==true
+-        // doesn't mean a direct click will succeed. Require line-of-sight too, or we walk instead.
+-        if (npc != null && npc.getLocalLocation() != null && Rs2Camera.isTileOnScreen(npc.getLocalLocation())
+-                && (Microbot.getClient().isInInstancedRegion() || (Rs2Walker.canReach(npc.getWorldLocation()) && npc.hasLineOfSight()))) {
++        // doesn't mean a direct click will succeed; line of sight is required too. But a close NPC that fails
++        // those checks is still clicked first: the game talks through bars, cell doors and counters (Drezel in
++        // his cell, bankers, a king on his throne), and walking "around" a locked door only stalls. Only when
++        // that click starts nothing is the NPC treated as out of reach for a while, and the walker takes over.
++        long nowMs = System.currentTimeMillis();
++        boolean directReach = Microbot.getClient().isInInstancedRegion()
++                || (npc != null && Rs2Walker.canReach(npc.getWorldLocation()) && npc.hasLineOfSight());
++        boolean walkingStalled = npcDistance <= NPC_CLOSE_DISTANCE && npcWalksWithoutProgress >= NPC_STALLED_WALKS;
++        boolean tryAcross = npc != null && npcDistance <= NPC_CLOSE_DISTANCE
++                && nowMs - unreachableNpcs.getOrDefault(npc.getIndex(), 0L) >= NPC_UNREACHABLE_MS;
++        if (npc != null && onScreen && (directReach || walkingStalled || tryAcross)) {
++            boolean across = !directReach;
++            if (across) {
++                log.info("[QuestHelper] {} at {} isn't directly reachable (door, bars or counter); clicking it from here",
++                        npc.getName(), npc.getWorldLocation());
++            }
++            npcWalksWithoutProgress = 0;
++            lastNpcWalkFrom = null;
+             if (isIterationCancelled()) {
+                 return false;
+             }
+@@ -1458,6 +1493,7 @@ public class QuestScript extends Script {
+             if (step.getText().stream().anyMatch(x -> x.toLowerCase().contains("kill"))) {
+                 if (!Rs2Combat.inCombat()) {
+                     npc.click("Attack");
++                    if (across) checkEngaged(npc);
+                 }
+                 return true;
+             }
+@@ -1501,20 +1537,47 @@ public class QuestScript extends Script {
+                 npcsHandled.add(npc.getIndex());
+                 sleepUntil(Rs2Dialogue::isInDialogue);
+             }
++            if (across) checkEngaged(npc);
+         } else if (npc != null && npc.getLocalLocation() != null && !Rs2Camera.isTileOnScreen(npc.getLocalLocation())) {
+             Rs2Walker.walkTo(npc.getWorldLocation(), 2);
+-        } else if (npc != null && (!npc.hasLineOfSight() || !Rs2Walker.canReach(npc.getWorldLocation()))) {
++        } else if (npc != null) {
++            // Count walks that start from the same tile: the walker has nothing left to do from here.
++            if (me != null && me.equals(lastNpcWalkFrom)) {
++                npcWalksWithoutProgress++;
++            } else {
++                npcWalksWithoutProgress = 0;
++                lastNpcWalkFrom = me;
++            }
+             Rs2Walker.walkTo(npc.getWorldLocation(), 2);
+         } else {
+-            if (step.getDefinedPoint().getWorldPoint().distanceTo(Rs2Player.getWorldLocation()) > 3) {
+-                Rs2Walker.walkTo(step.getDefinedPoint().getWorldPoint(), 2);
++            npcWalksWithoutProgress = 0;
++            lastNpcWalkFrom = null;
++            WorldPoint point = step.getDefinedPoint() == null ? null : step.getDefinedPoint().getWorldPoint();
++            if (point != null && me != null && point.distanceTo(me) > 3) {
++                Rs2Walker.walkTo(point, 2);
+                 return false;
+             }
++            Microbot.status = "Can't find " + StepNpcResolver.names(step) + " here";
+         }
+         return true;
+     }
+ 
+ 
++    /**
++     * After clicking an NPC that failed the reach checks: if no dialogue, interaction or fight starts, the game
++     * couldn't reach it ("I can't reach that!"), so it's left to the walker for {@value #NPC_UNREACHABLE_MS} ms.
++     */
++    private void checkEngaged(Rs2NpcModel npc) {
++        boolean engaged = sleepUntil(() -> Rs2Dialogue.isInDialogue() || Rs2Player.isInteracting()
++                || Rs2Combat.inCombat(), NPC_ENGAGE_WAIT_MS);
++        if (!engaged) {
++            unreachableNpcs.put(npc.getIndex(), System.currentTimeMillis());
++            log.info("[QuestHelper] Clicking {} from here started nothing; walking around to it instead", npc.getName());
++        } else {
++            unreachableNpcs.remove(npc.getIndex());
++        }
++    }
++
+     public boolean applyObjectStep(ObjectStep step) {
+         Rs2TileObjectModel object = step.getObjects().stream()
+                 .filter(Objects::nonNull)
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/helpers/quests/priestinperil/PriestInPeril.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/helpers/quests/priestinperil/PriestInPeril.java
+index 9bbc283069..624ca15eef 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/helpers/quests/priestinperil/PriestInPeril.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/helpers/quests/priestinperil/PriestInPeril.java
+@@ -240,7 +240,7 @@ public class PriestInPeril extends BasicQuestHelper
+ 
+ 	public void setupSteps()
+ 	{
+-		talkToRoald = new NpcStep(this, NpcID.KING_ROALD_CUTSCENE, new WorldPoint(3222, 3473, 0), "Speak to King Roald in Varrock Castle.");
++		talkToRoald = new NpcStep(this, NpcID.KING_ROALD, new WorldPoint(3222, 3473, 0), "Speak to King Roald in Varrock Castle.");
+ 		talkToRoald.addDialogStep("I'm looking for a quest!");
+ 		talkToRoald.addDialogStep("Yes.");
+ 		goToTemple = new ObjectStep(this, ObjectID.PRIESTPERILTEMPLEDOORR, new WorldPoint(3408, 3488, 0),
+@@ -253,7 +253,7 @@ public class PriestInPeril extends BasicQuestHelper
+ 			"Kill the Temple Guardian (level 30). It is immune to magic so you will need to use either ranged or melee.");
+ 		climbUpAfterKillingDog = new ObjectStep(this, ObjectID.LADDER_FROM_CELLAR, new WorldPoint(3405, 9907, 0),
+ 			"Climb back up the ladder and return to King Roald.");
+-		returnToKingRoald = new NpcStep(this, NpcID.KING_ROALD_CUTSCENE, new WorldPoint(3222, 3473, 0),
++		returnToKingRoald = new NpcStep(this, NpcID.KING_ROALD, new WorldPoint(3222, 3473, 0),
+ 			"Return to King Roald.");
+ 		returnToKingRoald.addSubSteps(climbUpAfterKillingDog);
+ 
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/steps/NpcStep.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/steps/NpcStep.java
+index 8bbe31bc22..fb5c38b5db 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/steps/NpcStep.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/questhelper/steps/NpcStep.java
+@@ -78,6 +78,7 @@ public class NpcStep extends DetailedQuestStep
+ 	protected List<Integer> mustBeFocusedOnNpcs = new ArrayList<>();
+ 
+ 	@Setter
++	@Getter
+ 	protected String npcName;
+ 
+ 	public NpcStep(QuestHelper questHelper, int npcID, String text, Requirement... requirements)
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/mouse/naturalmouse/api/MouseMotion.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/mouse/naturalmouse/api/MouseMotion.java
+index d8f7abab8b..b5ba15187b 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/mouse/naturalmouse/api/MouseMotion.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/mouse/naturalmouse/api/MouseMotion.java
+@@ -115,6 +115,25 @@ public class MouseMotion {
+             double deviationMultiplierX = (random.nextDouble() - 0.5) * 2;
+             double deviationMultiplierY = (random.nextDouble() - 0.5) * 2;
+ 
++            // A path-relative provider bends this movement sideways along (dy, -dx) / distance. Its curve is already 0
++            // at the end, so unlike the legacy deviation it isn't faded out (which flattened short, fast moves).
++            PathDeviationProvider.Curve curve = null;
++            double perpX = 0;
++            double perpY = 0;
++            if (deviationProvider instanceof PathDeviationProvider && distance > 0) {
++                curve = ((PathDeviationProvider) deviationProvider).curveFor(
++                        mousePosition.x, mousePosition.y, movement.destX, movement.destY, screenSize, random);
++                perpX = yDistance / distance;
++                perpY = -xDistance / distance;
++                // The curve already carries its size and direction.
++                deviationMultiplierX = 1;
++                deviationMultiplierY = 1;
++            }
++
++            // Noise fades out over the last steps so the cursor still lands on target. Never over more than about a
++            // third of the movement, or a quick move with few steps would be faded from its very first step.
++            int fadeSteps = Math.max(1, Math.min(effectFadeSteps, (int) Math.ceil(steps * 0.35)));
++
+             double completedXDistance = 0;
+             double completedYDistance = 0;
+             double noiseX = 0;
+@@ -124,10 +143,10 @@ public class MouseMotion {
+                 // All steps take equal amount of time. This is a value from 0...1 describing how far along the process is.
+                 double timeCompletion = i / (double) steps;
+ 
+-                double effectFadeStep = Math.max(i - (steps - effectFadeSteps) + 1, 0);
+-                // value from 0 to 1, when effectFadeSteps remaining steps, starts to decrease to 0 linearly
++                double effectFadeStep = Math.max(i - (steps - fadeSteps) + 1, 0);
++                // value from 0 to 1, when fadeSteps remaining steps, starts to decrease to 0 linearly
+                 // This is here so noise and deviation wouldn't add offset to mouse final position, when we need accuracy.
+-                double effectFadeMultiplier = (effectFadeSteps - effectFadeStep) / effectFadeSteps;
++                double effectFadeMultiplier = (fadeSteps - effectFadeStep) / fadeSteps;
+ 
+                 double xStepSize = flow.getStepSize(xDistance, steps, timeCompletion);
+                 double yStepSize = flow.getStepSize(yDistance, steps, timeCompletion);
+@@ -138,7 +157,15 @@ public class MouseMotion {
+                 double completion = Math.min(1, completedDistance / distance);
+ 
+                 DoublePoint noise = noiseProvider.getNoise(random, xStepSize, yStepSize);
+-                DoublePoint deviation = deviationProvider.getDeviation(distance, completion);
++                DoublePoint deviation;
++                if (curve != null) {
++                    // No fade: the curve's own shape returns it to the line.
++                    double offset = curve.offset(completion);
++                    deviation = new DoublePoint(perpX * offset, perpY * offset);
++                } else {
++                    deviation = deviationProvider.getDeviation(distance, completion);
++                }
++                double deviationFade = curve != null ? 1 : effectFadeMultiplier;
+ 
+                 noiseX += noise.getX();
+                 noiseY += noise.getY();
+@@ -146,9 +173,9 @@ public class MouseMotion {
+                 simulatedMouseY += yStepSize;
+ 
+                 long endTime = startTime + stepTime * (i + 1);
+-                int mousePosX = MathUtil.roundTowards(simulatedMouseX + deviation.getX() * deviationMultiplierX * effectFadeMultiplier + noiseX * effectFadeMultiplier, movement.destX);
++                int mousePosX = MathUtil.roundTowards(simulatedMouseX + deviation.getX() * deviationMultiplierX * deviationFade + noiseX * effectFadeMultiplier, movement.destX);
+ 
+-                int mousePosY = MathUtil.roundTowards(simulatedMouseY + deviation.getY() * deviationMultiplierY * effectFadeMultiplier + noiseY * effectFadeMultiplier, movement.destY);
++                int mousePosY = MathUtil.roundTowards(simulatedMouseY + deviation.getY() * deviationMultiplierY * deviationFade + noiseY * effectFadeMultiplier, movement.destY);
+ 
+                 mousePosX = limitByScreenWidth(mousePosX);
+                 mousePosY = limitByScreenHeight(mousePosY);
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/mouse/naturalmouse/util/FactoryTemplates.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/mouse/naturalmouse/util/FactoryTemplates.java
+index 84b18a19a7..32370d34bc 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/mouse/naturalmouse/util/FactoryTemplates.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/mouse/naturalmouse/util/FactoryTemplates.java
+@@ -40,7 +40,7 @@ public class FactoryTemplates {
+                 new Flow(FlowTemplates.stoppingFlow())
+         ));
+         DefaultSpeedManager manager = new DefaultSpeedManager(flows);
+-        factory.setDeviationProvider(new SinusoidalDeviationProvider(9));
++        factory.setDeviationProvider(new HumanArcDeviationProvider());
+         factory.setNoiseProvider(new DefaultNoiseProvider(1.6));
+         factory.getNature().setReactionTimeBaseMs(100);
+ 
+@@ -128,7 +128,7 @@ public class FactoryTemplates {
+                 new Flow(FlowTemplates.jaggedFlow())
+         ));
+         DefaultSpeedManager manager = new DefaultSpeedManager(flows);
+-        factory.setDeviationProvider(new SinusoidalDeviationProvider(SinusoidalDeviationProvider.DEFAULT_SLOPE_DIVIDER));
++        factory.setDeviationProvider(new HumanArcDeviationProvider());
+         factory.setNoiseProvider(new DefaultNoiseProvider(DefaultNoiseProvider.DEFAULT_NOISINESS_DIVIDER));
+         factory.getNature().setReactionTimeVariationMs(100);
+         manager.setMouseMovementBaseTimeMs(currentBaseTime);
+@@ -177,7 +177,7 @@ public class FactoryTemplates {
+                 new Flow(FlowTemplates.jaggedFlow())
+         ));
+         DefaultSpeedManager manager = new DefaultSpeedManager(flows);
+-        factory.setDeviationProvider(new SinusoidalDeviationProvider(SinusoidalDeviationProvider.DEFAULT_SLOPE_DIVIDER));
++        factory.setDeviationProvider(new HumanArcDeviationProvider());
+         factory.setNoiseProvider(new DefaultNoiseProvider(DefaultNoiseProvider.DEFAULT_NOISINESS_DIVIDER));
+         factory.getNature().setReactionTimeVariationMs(100);
+         manager.setMouseMovementBaseTimeMs(currentBaseTime);
+@@ -215,7 +215,7 @@ public class FactoryTemplates {
+                 new Flow(FlowTemplates.jaggedFlow())
+         ));
+         DefaultSpeedManager manager = new DefaultSpeedManager(flows);
+-        factory.setDeviationProvider(new SinusoidalDeviationProvider(SinusoidalDeviationProvider.DEFAULT_SLOPE_DIVIDER));
++        factory.setDeviationProvider(new HumanArcDeviationProvider());
+         factory.setNoiseProvider(new DefaultNoiseProvider(DefaultNoiseProvider.DEFAULT_NOISINESS_DIVIDER));
+         factory.getNature().setReactionTimeVariationMs(90);
+         manager.setMouseMovementBaseTimeMs(currentBaseTime);
+@@ -262,7 +262,7 @@ public class FactoryTemplates {
+                 new Flow(FlowTemplates.stoppingFlow())
+         ));
+         DefaultSpeedManager manager = new DefaultSpeedManager(flows);
+-        factory.setDeviationProvider(new SinusoidalDeviationProvider(SinusoidalDeviationProvider.DEFAULT_SLOPE_DIVIDER));
++        factory.setDeviationProvider(new HumanArcDeviationProvider());
+         factory.setNoiseProvider(new DefaultNoiseProvider(DefaultNoiseProvider.DEFAULT_NOISINESS_DIVIDER));
+         factory.getNature().setReactionTimeVariationMs(110);
+         manager.setMouseMovementBaseTimeMs(400);
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/reachable/Rs2Reachable.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/reachable/Rs2Reachable.java
+index feaccbafbe..7b7a4e458f 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/reachable/Rs2Reachable.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/reachable/Rs2Reachable.java
+@@ -14,6 +14,8 @@ import net.runelite.client.plugins.microbot.shortestpath.WorldPointUtil;
+ 
+ public class Rs2Reachable {
+     private static int lastUpdateTick = 0;
++    // The start tile the cached set was computed from; a different start in the same tick recomputes.
++    private static int lastStartPacked = Integer.MIN_VALUE;
+     @Getter
+     private static IntSet reachableTiles;
+ 
+@@ -29,14 +31,32 @@ public class Rs2Reachable {
+         return reachableTiles.contains(packedPoint);
+     }
+ 
++    /**
++     * True when the player can walk to {@code target} from where they stand, without opening anything (closed
++     * doors and walls block). Unlike {@link #isReachable(WorldPoint)}, the search starts at the player.
++     */
++    public static boolean isReachableFromPlayer(WorldPoint target) {
++        if (target == null) return false;
++        WorldPoint start = Microbot.getClientThread().runOnClientThreadOptional(() -> {
++            var player = Microbot.getClient().getLocalPlayer();
++            return player == null ? null : player.getWorldLocation();
++        }).orElse(null);
++        if (start == null || start.getPlane() != target.getPlane()) return false;
++        IntSet tiles = getReachableTiles(start);
++        return tiles.contains(WorldPointUtil.packWorldPoint(target.getX(), target.getY(), target.getPlane()));
++    }
++
+     public static IntSet getReachableTiles(WorldPoint start) {
+         Client client = Microbot.getClient();
+         int tick = client.getTickCount();
++        int startPacked = start == null ? Integer.MIN_VALUE
++                : WorldPointUtil.packWorldPoint(start.getX(), start.getY(), start.getPlane());
+ 
+-        // Reuse cache for this tick
+-        if (reachableTiles != null && lastUpdateTick == tick) {
++        // Reuse cache for this tick and start tile
++        if (reachableTiles != null && lastUpdateTick == tick && lastStartPacked == startPacked) {
+             return reachableTiles;
+         }
++        lastStartPacked = startPacked;
+ 
+         return Microbot.getClientThread().invoke(() -> {
+             Client c = Microbot.getClient();
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2Walker.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2Walker.java
+index 2487af134f..dedb5f1df0 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2Walker.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2Walker.java
+@@ -55,6 +55,7 @@ import net.runelite.client.plugins.microbot.util.poh.PohTransport;
+ import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
+ import net.runelite.client.plugins.microbot.util.leaguetransport.LeaguesRegion;
+ import net.runelite.client.plugins.microbot.util.tile.Rs2Tile;
++import net.runelite.client.plugins.microbot.util.widget.Rs2Warnings;
+ import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
+ import net.runelite.client.plugins.microbot.util.walker.door.DoorAttemptLedger;
+ import net.runelite.client.plugins.microbot.util.walker.door.FirstRouteInteractionSelector;
+@@ -8054,28 +8055,13 @@ public class Rs2Walker {
+         return sleepUntil(() -> !Rs2Widget.isWidgetVisible(InterfaceID.Worldmap.CLOSE), 3000);
+     }
+ 
+-    private static final int[] CWS_WARNING_GROUPS = {InterfaceID.CWS_WARNING_10, InterfaceID.CWS_WARNING_4};
+-
++    // Warning screens (Mort Myre gate, Wilderness ditch, dungeon entrances...): every variant, see Rs2Warnings.
+     static boolean isCwsWarningVisible() {
+-        for (int group : CWS_WARNING_GROUPS) {
+-            if (Rs2Widget.isWidgetVisible(group, 20)) return true;
+-        }
+-        return false;
++        return Rs2Warnings.isOpen();
+     }
+ 
+     static boolean acceptCwsWarning() {
+-        for (int group : CWS_WARNING_GROUPS) {
+-            if (!Rs2Widget.isWidgetVisible(group, 20) || !Rs2Widget.clickWidget(group, 20)) continue;
+-            sleepUntil(() -> {
+-                Widget checkBoxWidget = Rs2Widget.getWidget(group, 20);
+-                if (checkBoxWidget == null) return false;
+-                return Microbot.getClientThread().runOnClientThreadOptional(() -> checkBoxWidget.getSpriteId() != 941)
+-                        .orElse(false);
+-            });
+-            Rs2Widget.clickWidget(group, 17);
+-            return sleepUntil(() -> !Rs2Widget.isWidgetVisible(group, 20), 3000);
+-        }
+-        return false;
++        return Rs2Warnings.accept();
+     }
+ 
+ 
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2WalkerDoors.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2WalkerDoors.java
+index 35057bdcd1..ab9cec805d 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2WalkerDoors.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2WalkerDoors.java
+@@ -1,5 +1,6 @@
+ package net.runelite.client.plugins.microbot.util.walker;
+ 
++import net.runelite.client.plugins.microbot.util.widget.Rs2Warnings;
+ import net.runelite.client.plugins.microbot.util.walker.door.FirstRouteInteractionSelector;
+ import lombok.Getter;
+ import lombok.Setter;
+@@ -1919,6 +1920,11 @@ final class Rs2WalkerDoors {
+         WorldPoint walkTarget = currentTarget;
+         Object plannerAtClick = Rs2PathApi.getPathfinder();
+         java.util.function.BooleanSupplier cancelled = () -> {
++            // A gate with a warning screen (Mort Myre, dungeon entrances) doesn't open until it's
++            // accepted: stop waiting now and accept it below rather than timing out in front of it.
++            if (Rs2Warnings.isOpen()) {
++                return true;
++            }
+             // isWalkSuperseded(null) answers true, and a door can legitimately be handled outside a
+             // walk session (recovery paths); no target means there is nothing to be cancelled.
+             // Identity-only by necessity — see isWalkSuperseded: the completion-evaluating variant
+@@ -1951,8 +1957,23 @@ final class Rs2WalkerDoors {
+             }
+             doorLegAwaitMs += tookMs;
+         }
++        // The door opened a warning screen: accept it ("don't warn again" ticked), then wait for the crossing
++        // once more, so the door counts as traversed instead of failed and re-clicked.
++        if (!WARNING_REAWAIT.get() && Rs2Warnings.isOpen()) {
++            log.info("[Walker] Door/gate at {} opened a warning screen; accepting it", probe);
++            if (Rs2Warnings.accept()) {
++                WARNING_REAWAIT.set(Boolean.TRUE);
++                try {
++                    waitForDoorInteractionProgress(fromWp, toWp, probe, doorActions, action, object);
++                } finally {
++                    WARNING_REAWAIT.set(Boolean.FALSE);
++                }
++            }
++        }
+     }
+ 
++    private static final ThreadLocal<Boolean> WARNING_REAWAIT = ThreadLocal.withInitial(() -> Boolean.FALSE);
++
+     static boolean waitForDoorEdgeResolution(WorldPoint fromWp, WorldPoint toWp, int timeoutMs) {
+         long startedAt = System.currentTimeMillis();
+         DoorResolution resolution = Rs2WalkerAwaits.awaitDoorEdgeResolution(fromWp, toWp, timeoutMs);
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2WalkerTransports.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2WalkerTransports.java
+index 6aaac03c86..6563871a2c 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2WalkerTransports.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/walker/Rs2WalkerTransports.java
+@@ -3107,7 +3107,7 @@ final class Rs2WalkerTransports {
+         return false;
+     }
+ 
+-    private static Widget findCharterDestinationWidget(String destinationText) {
++    static Widget findCharterDestinationWidget(String destinationText) {
+         return Microbot.getClientThread().runOnClientThreadOptional(() -> {
+             Widget root = Microbot.getClient().getWidget(885, 4);
+             if (root == null || root.isHidden()) {
+@@ -3199,7 +3199,7 @@ final class Rs2WalkerTransports {
+         return actions != null && Arrays.stream(actions).anyMatch(action -> action != null && !action.isEmpty());
+     }
+ 
+-    private static boolean invokeCharterDestinationWidget(Widget widget, String destinationText) {
++    static boolean invokeCharterDestinationWidget(Widget widget, String destinationText) {
+         if (widget == null) {
+             return false;
+         }
+@@ -3234,7 +3234,7 @@ final class Rs2WalkerTransports {
+                 .orElse(null);
+     }
+ 
+-    private static void confirmCharterTravelIfPrompted() {
++    static void confirmCharterTravelIfPrompted() {
+         if (sleepUntil(Rs2Dialogue::hasSelectAnOption, 2000)) {
+             Rs2Dialogue.clickOption("Yes", true);
+         }

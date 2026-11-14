@@ -1,0 +1,243 @@
+package net.runelite.client.plugins.microbot.shadowfaxhillgiants;
+
+import net.runelite.client.config.Config;
+import net.runelite.client.config.ConfigGroup;
+import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Range;
+
+@ConfigGroup(HillGiantConfig.GROUP)
+public interface HillGiantConfig extends Config {
+
+    String GROUP = "shadowfaxhillgiants";
+
+    @ConfigSection(
+            name = "Food",
+            description = "Eating and restocking food at Varrock west bank",
+            position = 0
+    )
+    String foodSection = "food";
+
+    @ConfigSection(
+            name = "Loot",
+            description = "Which drops to pick up",
+            position = 1
+    )
+    String lootSection = "loot";
+
+    @ConfigSection(
+            name = "Stamina",
+            description = "Stamina potions from the bank for the walks to and from the bank",
+            position = 2
+    )
+    String staminaSection = "stamina";
+
+    @ConfigItem(
+            keyName = "useStaminas",
+            name = "Use stamina potions",
+            description = "Take stamina potions from the bank (if it has any; they aren't bought) and drink one on the "
+                    + "way to or from the bank when run energy is low. Members worlds only: stamina potions can't be "
+                    + "used on free-to-play worlds",
+            position = 0,
+            section = staminaSection
+    )
+    default boolean useStaminas() {
+        return true;
+    }
+
+    @Range(min = 1, max = 5)
+    @ConfigItem(
+            keyName = "staminaCount",
+            name = "Stamina potions to carry",
+            description = "How many stamina potions to keep in the inventory; topped up on each bank trip",
+            position = 1,
+            section = staminaSection
+    )
+    default int staminaCount() {
+        return 1;
+    }
+
+    @Range(min = 5, max = 90)
+    @ConfigItem(
+            keyName = "staminaAtEnergy",
+            name = "Drink at run energy %",
+            description = "Drink a stamina potion while travelling when run energy drops to this and no stamina "
+                    + "effect is active",
+            position = 2,
+            section = staminaSection
+    )
+    default int staminaAtEnergy() {
+        return 30;
+    }
+
+    @ConfigSection(
+            name = "General",
+            description = "Dungeon entrance, antiban and on-screen overlay",
+            position = 3
+    )
+    String generalSection = "general";
+
+    @ConfigItem(
+            keyName = "useFood",
+            name = "Use food",
+            description = "Withdraw and buy food. When off, the bot only eats food already in the inventory; "
+                    + "once that's gone and health drops below 25% it walks to Varrock west bank and logs out",
+            position = 0,
+            section = foodSection
+    )
+    default boolean useFood() {
+        return true;
+    }
+
+    @Range(min = 10, max = 90)
+    @ConfigItem(
+            keyName = "eatAtPercent",
+            name = "Eat at HP %",
+            description = "Eat any food in the inventory when health drops to this percentage. With no food left, bank at this percentage",
+            position = 1,
+            section = foodSection
+    )
+    default int eatAtPercent() {
+        return 50;
+    }
+
+    @Range(min = 10, max = 90)
+    @ConfigItem(
+            keyName = "escapeAtPercent",
+            name = "Escape at HP %",
+            description = "With no food left in the inventory, stop fighting at this health and climb the ladder out of the "
+                    + "dungeon right away. Then restock at the bank, or with food off, rest on the surface and come back",
+            position = 2,
+            section = foodSection
+    )
+    default int escapeAtPercent() {
+        return 50;
+    }
+
+    @ConfigItem(
+            keyName = "foodName",
+            name = "Food to withdraw",
+            description = "Exact name of the food to take from the bank, e.g. Trout or Lobster. Leave blank to take whatever food the bank has",
+            position = 3,
+            section = foodSection
+    )
+    default String foodName() {
+        return "";
+    }
+
+    @Range(min = 0, max = 27)
+    @ConfigItem(
+            keyName = "foodAmount",
+            name = "Food per trip",
+            description = "How much food to carry out of the bank each trip. 0 means never withdraw food",
+            position = 4,
+            section = foodSection
+    )
+    default int foodAmount() {
+        return 8;
+    }
+
+    @ConfigItem(
+            keyName = "restockFromGe",
+            name = "Buy food on the GE",
+            description = "When the bank has no food left, buy fish at the Grand Exchange, selling some herbs if coins run short. "
+                    + "Buys tuna up to 20 Hitpoints, lobster up to 40, swordfish above that. Needs 100 total level",
+            position = 5,
+            section = foodSection
+    )
+    default boolean restockFromGe() {
+        return true;
+    }
+
+    @Range(min = 1_000, max = 1_000_000)
+    @ConfigItem(
+            keyName = "restockBudget",
+            name = "Food budget (gp)",
+            description = "Most coins to spend on fish per Grand Exchange trip",
+            position = 6,
+            section = foodSection
+    )
+    default int restockBudget() {
+        return 30_000;
+    }
+
+    @Range(min = 1, max = 1_000)
+    @ConfigItem(
+            keyName = "restockAmount",
+            name = "Fish to buy",
+            description = "How many fish to buy per Grand Exchange trip, if the budget allows",
+            position = 7,
+            section = foodSection
+    )
+    default int restockAmount() {
+        return 100;
+    }
+
+    @Range(min = 0, max = 100_000)
+    @ConfigItem(
+            keyName = "minHerbValue",
+            name = "Minimum herb value (gp)",
+            description = "Only pick up grimy herbs whose Grand Exchange price is at least this much each",
+            position = 0,
+            section = lootSection
+    )
+    default int minHerbValue() {
+        return 1000;
+    }
+
+    @ConfigItem(
+            keyName = "extraLoot",
+            name = "Also loot",
+            description = "Comma-separated item names to pick up regardless of value",
+            position = 1,
+            section = lootSection
+    )
+    default String extraLoot() {
+        return "Coins, Limpwurt root, Nature rune, Law rune";
+    }
+
+    @ConfigItem(
+            keyName = "buryBigBones",
+            name = "Bury big bones",
+            description = "Bury the big bones the giants drop for Prayer experience. When off, big bones are picked up and banked instead",
+            position = 2,
+            section = lootSection
+    )
+    default boolean buryBigBones() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "useBrassKey",
+            name = "Use brass key",
+            description = "Enter through the locked shed west of the Cooks' Guild. Without a key in the inventory or bank, "
+                    + "the bot fetches the one that spawns in Edgeville Dungeon first. When off, it walks in via the Edgeville trapdoor",
+            position = 0,
+            section = generalSection
+    )
+    default boolean useBrassKey() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "antiban",
+            name = "Antiban",
+            description = "Apply the combat antiban template: action cooldowns, natural mouse, play styles and micro-break chances",
+            position = 1,
+            section = generalSection
+    )
+    default boolean antiban() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "showOverlay",
+            name = "Show stats overlay",
+            description = "Draw the Shadowfax Hill Giants stats panel on screen",
+            position = 2,
+            section = generalSection
+    )
+    default boolean showOverlay() {
+        return true;
+    }
+}
