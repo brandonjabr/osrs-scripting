@@ -2,7 +2,7 @@
 
 A portfolio of automation scripts for Old School RuneScape, written as plugins for the open-source
 [Microbot](https://github.com/chsami/Microbot) client (a fork of [RuneLite](https://github.com/runelite/runelite)).
-There are 15 scripts, all under the **Shadowfax** name, plus a shared framework they're built on: about 35,000
+There are 15 scripts, all under my development pseudonym **Shadowfax**, plus a shared framework they're built on: about 35,000
 lines of Java.
 
 > **Disclaimer: for educational purposes only.**
