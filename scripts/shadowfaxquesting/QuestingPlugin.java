@@ -11,15 +11,15 @@ import javax.inject.Inject;
 
 @PluginDescriptor(
         name = PluginDescriptor.Default + "Shadowfax Questing",
-        description = "Completes the easy free-to-play quests plus Waterfall Quest and Fight Arena, buying quest items on the GE",
-        tags = {"quest", "questing", "quests", "f2p", "waterfall", "fight arena", "microbot"},
+        description = "Completes 50 quests, from Cook's Assistant to Holy Grail and Fairytale I (members quests in the OSRS Wiki's optimal order), buying quest items on the GE",
+        tags = {"quest", "questing", "quests", "f2p", "members", "optimal", "microbot"},
         version = QuestingPlugin.VERSION,
         enabledByDefault = false
 )
 @Slf4j
 public class QuestingPlugin extends Plugin {
 
-    static final String VERSION = "1.0.0";
+    static final String VERSION = "1.1.0";
 
     @Inject
     private QuestingScript script;

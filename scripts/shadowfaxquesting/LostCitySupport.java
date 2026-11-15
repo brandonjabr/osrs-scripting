@@ -82,15 +82,10 @@ final class LostCitySupport {
 
     private static final int TABLET = ItemID.POH_TABLET_LUMBRIDGETELEPORT;
     private static final WorldPoint DRAMEN_TREE = new WorldPoint(2861, 9735, 0);
-    private static final WorldPoint PORT_SARIM_DOCK = new WorldPoint(3047, 3236, 0);
     private static final WorldPoint ENTRANA_LADDER = new WorldPoint(2820, 3374, 0);
-    // The monks on the Port Sarim side; the SHIPMONK2 ones on Entrana sail back.
-    private static final int[] PORT_SARIM_MONKS = {NpcID.SHIPMONK, NpcID.SHIPMONK1_B, NpcID.SHIPMONK1_C};
     private static final String LADDER_WARNING = "risk I will have to take";
 
     // Quest Helper's zones.
-    private static final WorldPoint ENTRANA_SW = new WorldPoint(2798, 3327, 0);
-    private static final WorldPoint ENTRANA_NE = new WorldPoint(2878, 3394, 1);
     private static final WorldPoint DUNGEON_SW = new WorldPoint(2817, 9722, 0);
     private static final WorldPoint DUNGEON_NE = new WorldPoint(2879, 9784, 0);
 
@@ -116,10 +111,7 @@ final class LostCitySupport {
                     && (!readyForEntrana(ctx) || Rs2Bank.isOpen()),
             LostCitySupport::prepare);
 
-    /*
-     * Boarding is done here, not by Quest Helper's talk-to-the-monk step: that step walks to the monk, and the walk
-     * keeps going after the "yes" sends us to Entrana, crosses the gangplank and takes the boat straight back.
-     */
+    // Boarding: see EntranaTrip for why it isn't left to Quest Helper's step.
     static final StepOverride BOARD_BOAT = new StepOverride("taking the boat to Entrana",
             ctx -> ctx.stepText().contains("boat to Entrana") && !onEntrana() && !inDungeon()
                     && !Rs2Bank.isOpen() && readyForEntrana(ctx),
@@ -170,39 +162,11 @@ final class LostCitySupport {
             ctx.requestItems(entranaKit(ctx), true);
             return true;
         }
-        if (!Rs2Bank.isOpen()) {
-            Microbot.status = "Going to a bank to leave weapons and armour behind";
-            Rs2Bank.walkToBankAndUseBank();
-            return true;
-        }
-        if (!Rs2Equipment.items().isEmpty()) {
-            Microbot.status = "Banking worn equipment (no weapons or armour on Entrana)";
-            Rs2Bank.depositEquipment();
-            sleepUntil(() -> Rs2Equipment.items().isEmpty(), 3_000);
-            return true;
-        }
-        Microbot.status = "Banking what the monks won't allow";
-        Rs2Bank.depositAllExcept(i -> allowedOnEntrana(ctx, i));
-        sleepUntil(() -> Rs2Inventory.items().allMatch(i -> allowedOnEntrana(ctx, i)), 3_000);
-        return true;
+        return EntranaTrip.bankForEntrana(i -> allowedOnEntrana(ctx, i));
     }
 
-    /** Next to the Port Sarim monks: Take-boat, then wait out the search and the trip without walking anywhere. */
     private static boolean board(QuestContext ctx) {
-        Rs2NpcModel monk = Microbot.getRs2NpcCache().query().withIds(PORT_SARIM_MONKS).nearestOnClientThread(10);
-        if (monk == null) {
-            Microbot.status = "Walking to the Entrana monks at Port Sarim";
-            ctx.walkTo(PORT_SARIM_DOCK, 4);
-            return true;
-        }
-        Microbot.status = "Taking the boat to Entrana";
-        if (!monk.click("Take-boat")) return true;
-        if (sleepUntil(LostCitySupport::onEntrana, 20_000)) {
-            log.info("[Questing] Lost City: arrived on Entrana");
-        } else if (!Rs2Dialogue.isInDialogue()) {
-            log.warn("[Questing] Lost City: the monks didn't take us to Entrana yet");
-        }
-        return true;
+        return EntranaTrip.board(ctx, "Lost City");
     }
 
     // --- On Entrana ---
@@ -460,7 +424,7 @@ final class LostCitySupport {
     }
 
     private static boolean onEntrana() {
-        return inside(ENTRANA_SW, ENTRANA_NE);
+        return EntranaTrip.onEntrana();
     }
 
     private static boolean inside(WorldPoint sw, WorldPoint ne) {

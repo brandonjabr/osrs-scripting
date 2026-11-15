@@ -16,7 +16,7 @@ lines of Java.
 
 ## Highlights
 
-- **A quest engine that plays 30 quests.** It drives Quest Helper's step graphs directly, and works out what each
+- **A quest engine that plays 50 quests.** It drives Quest Helper's step graphs directly, and works out what each
   quest needs to carry, buy and wear. Quest-specific hooks cover the parts a generic step can't handle, such as
   puzzles, safespots, smuggling restrictions and random item requests.
 - **Long-running, unattended designs.** Every script is an explicit state machine with a visible overlay. Every action
@@ -34,7 +34,7 @@ lines of Java.
 
 | Script | What it does |
 |---|---|
-| [Shadowfax Questing](#shadowfax-questing) | Completes 30 quests in a row, from Cook's Assistant to Dragon Slayer I and Fairytale I |
+| [Shadowfax Questing](#shadowfax-questing) | Completes 50 quests in a row, from Cook's Assistant to Dragon Slayer I, Holy Grail and Fairytale I |
 | [Shadowfax Slayer](#shadowfax-slayer) | Gets slayer tasks from Turael, Vannaka or Nieve and completes them |
 | [Shadowfax Merchant](#shadowfax-merchant) | Flips items and buys dips on the Grand Exchange using live wiki prices |
 | [Shadowfax Warrior's Guild](#shadowfax-warriors-guild) | Earns tokens, then gets every defender up to the dragon defender |
@@ -51,29 +51,39 @@ lines of Java.
 | [Shadowfax Account Starter](#shadowfax-account-starter) | Starts a fresh account on the Lumbridge cows, with scimitar upgrades paid for in cowhides |
 
 ### Shadowfax Questing
-`scripts/shadowfaxquesting` · 16 files, ~4,800 lines
+`scripts/shadowfaxquesting` · 21 files, ~5,500 lines
 
 Runs a selected list of quests back to back. It picks the next quest whose requirements are met, then quests with
 what's already carried. It only goes to the bank, or the Grand Exchange, when a step can't make progress without an
 item. A resumed quest is synced with the game first, by loading the guide and reading the quest journal, so a restart
-carries on where it left off.
+carries on where it left off. Members quests run in the order of the OSRS Wiki's optimal quest guide, and a quest
+whose skill, quest or combat requirements aren't met yet waits until they are.
 
-**Quests:** Cook's Assistant, Sheep Shearer, Romeo & Juliet, The Restless Ghost, Rune Mysteries, Imp Catcher, Doric's
-Quest, Witch's Potion, Goblin Diplomacy, Ernest the Chicken, X Marks the Spot, Misthalin Mystery, The Ides of Milk,
-Pirate's Treasure, The Corsair Curse, Vampyre Slayer, Prince Ali Rescue, Demon Slayer, The Knight's Sword, Black
-Knights' Fortress, Below Ice Mountain, Dragon Slayer I, Waterfall Quest, Fight Arena, Priest in Peril, Nature Spirit,
-Ghosts Ahoy, Animal Magnetism, Lost City and Fairytale I - Growing Pains.
+**Free-to-play quests (22):** Cook's Assistant, Sheep Shearer, Romeo & Juliet, The Restless Ghost, Rune Mysteries,
+Imp Catcher, Doric's Quest, Witch's Potion, Goblin Diplomacy, Ernest the Chicken, X Marks the Spot, Misthalin Mystery,
+The Ides of Milk, Pirate's Treasure, The Corsair Curse, Vampyre Slayer, Prince Ali Rescue, Demon Slayer, The Knight's
+Sword, Black Knights' Fortress, Below Ice Mountain and Dragon Slayer I.
+
+**Members quests (28):** Gertrude's Cat, Dwarf Cannon, Waterfall Quest, Tree Gnome Village, Witch's House, The
+Tourist Trap, Druidic Ritual, Recruitment Drive, Fight Arena, Plague City, Monk's Friend, Hazeel Cult, Biohazard,
+Tower of Life, Tribal Totem, Death Plateau, Merlin's Crystal, Holy Grail, Murder Mystery, The Grand Tree, Rag and Bone
+Man I, Priest in Peril, Nature Spirit, Ghosts Ahoy, Making History, Animal Magnetism, Lost City and Fairytale I -
+Growing Pains.
 
 Quest-specific support classes handle what a generic step can't do. Some examples:
 - **Dragon Slayer I:** plans melee gear by Attack and Defence level, and fetches and wears the anti-dragon shield
   early. It packs food for Melzar's Maze and for Elvarg, uses Protect from Magic against Elvarg, and retreats to
   restock rather than fight on with no food.
-- **Lost City:** banks all weapons and armour for Entrana, then casts spells by hand with no staff (autocast needs
-  one). It kills zombies for a bronze axe, finds a safespot behind a fungus for the Tree Spirit, and teleports out.
+- **Lost City and Holy Grail:** share an Entrana trip that banks all weapons and armour and boards the boat directly,
+  so the walker can't sail straight back. Lost City then casts spells by hand with no staff (autocast needs one),
+  kills zombies for a bronze axe, finds a safespot behind a fungus for the Tree Spirit, and teleports out. Holy Grail
+  wields Excalibur for the Black Knight Titan, since only it can land the killing blow.
+- **Recruitment Drive:** banks everything worn and carried, since Sir Tiffy takes nothing into the tests.
+- **Gertrude's Cat:** searches the Lumberyard crates in turn, nearest the mewing first, until the kitten turns up.
 - **Fairytale I:** reads Malignius Mortifer's three random items from a varbit and buys them. It runs each farmer
   conversation itself, so the investigation can't stall.
-- **Ghosts Ahoy, Animal Magnetism, Priest in Peril, Nature Spirit and Prince Ali Rescue:** each has its own puzzle and
-  item handling.
+- **Ghosts Ahoy, Animal Magnetism, Priest in Peril, Nature Spirit, Prince Ali Rescue and Merlin's Crystal:** each
+  has its own puzzle and item handling.
 
 ### Shadowfax Slayer
 `scripts/shadowfaxslayer` · 11 files, ~3,700 lines

@@ -212,6 +212,20 @@ public final class QuestCatalog {
                             + "shield is fetched early and always worn. Elvarg is fought with 20 food, Protect from "
                             + "Magic at 37 Prayer and prayer potions on members worlds; no antipoison is needed.")
                     .build()),
+            // Members quests, in the OSRS Wiki's optimal quest order.
+            entry(QuestingConfig::gertrudesCat, QuestDefinition.builder(QuestHelperQuest.GERTRUDES_CAT)
+                    .label("Gertrude's Cat")
+                    .members()
+                    .override(GertrudesCatSupport.SEARCH_CRATES)
+                    .notes("Members. Buys the milk, sardine and doogle leaves, and searches the Lumberyard crates in "
+                            + "turn (nearest the mewing first) until the kitten turns up.")
+                    .build()),
+            entry(QuestingConfig::dwarfCannon, QuestDefinition.builder(QuestHelperQuest.DWARF_CANNON)
+                    .label("Dwarf Cannon")
+                    .members()
+                    .notes("Members. Repairs the fence railings, finds Lollk and fixes the cannon, all from Quest "
+                            + "Helper's steps (the cannon repair is its highlighted tool puzzle).")
+                    .build()),
             entry(QuestingConfig::waterfallQuest, QuestDefinition.builder(QuestHelperQuest.WATERFALL_QUEST)
                     .label("Waterfall Quest")
                     .members()
@@ -220,12 +234,145 @@ public final class QuestCatalog {
                     .notes("Members. Fire giants (86) and a moss guardian (84) are run past without gear, so the wiki "
                             + "recommends combat 25. Places the runes on all six pillars and the amulet on the statue itself.")
                     .build()),
+            entry(QuestingConfig::treeGnomeVillage, QuestDefinition.builder(QuestHelperQuest.TREE_GNOME_VILLAGE)
+                    .label("Tree Gnome Village")
+                    .members()
+                    .fight(55)
+                    .minFood(15)
+                    .notes("Members. Through the hedge maze, logs for the gnome fortress and the ballista "
+                            + "coordinates, then the Khazard Warlord (level 112) for the last orb; the wiki suggests "
+                            + "safespotting him, so the gate is combat 55 with 15 food.")
+                    .build()),
+            entry(QuestingConfig::witchsHouse, QuestDefinition.builder(QuestHelperQuest.WITCHS_HOUSE)
+                    .label("Witch's House")
+                    .members()
+                    .fight(35)
+                    .minFood(10)
+                    .notes("Members. The key under the doormat, the cheese for the mouse hole and the magnet, then "
+                            + "the witch's experiment in four forms (levels 19, 30, 42 and 53) one after another.")
+                    .build()),
+            entry(QuestingConfig::touristTrap, QuestDefinition.builder(QuestHelperQuest.THE_TOURIST_TRAP)
+                    .label("The Tourist Trap")
+                    .members()
+                    .fight(40)
+                    .minFood(10)
+                    // The desert drains health without water.
+                    .extra(ItemNeed.of(ItemID.WATER_SKIN4, "Waterskin(4)", 3))
+                    .notes("Members. Needs 10 Fletching and 20 Smithing. Takes three waterskins for the desert heat, "
+                            + "fights the Mercenary Captain (level 47) for the key, and gets Ana out of the mine in a "
+                            + "barrel and cart.")
+                    .build()),
+            entry(QuestingConfig::druidicRitual, QuestDefinition.builder(QuestHelperQuest.DRUIDIC_RITUAL)
+                    .label("Druidic Ritual")
+                    .members()
+                    .notes("Members. Buys the four raw meats and dips them in the Cauldron of Thunder under Taverley. "
+                            + "Unlocks Herblore.")
+                    .build()),
+            entry(QuestingConfig::recruitmentDrive, QuestDefinition.builder(QuestHelperQuest.RECRUITMENT_DRIVE)
+                    .label("Recruitment Drive")
+                    .members()
+                    .override(RecruitmentDriveSupport.EMPTY_HANDED)
+                    .notes("Members. Needs Black Knights' Fortress and Druidic Ritual. Banks everything, worn and "
+                            + "carried, before Sir Tiffy (he takes nothing in), then the seven tests with Quest "
+                            + "Helper's puzzle solutions; Sir Leye (level 20) is fought bare-handed.")
+                    .build()),
             entry(QuestingConfig::fightArena, QuestDefinition.builder(QuestHelperQuest.FIGHT_ARENA)
                     .label("Fight Arena")
                     .members()
                     .fight(50)
                     .notes("Members. Fights a Khazard scorpion (44), Khazard ogre (63) and the Bouncer (137); all can be "
                             + "safespotted, and General Khazard (142) is optional. The wiki recommends combat 50.")
+                    .build()),
+            entry(QuestingConfig::plagueCity, QuestDefinition.builder(QuestHelperQuest.PLAGUE_CITY)
+                    .label("Plague City")
+                    .members()
+                    .notes("Members. Buys the buckets of water, rope, chocolate dust, milk and snape grass; softens "
+                            + "the mud with four buckets, pulls off the sewer grill and makes the hangover cure for "
+                            + "Elena's rescue.")
+                    .build()),
+            entry(QuestingConfig::monksFriend, QuestDefinition.builder(QuestHelperQuest.MONKS_FRIEND)
+                    .label("Monk's Friend")
+                    .members()
+                    .notes("Members. Finds the child's blanket in the thieves' den, then fetches water for Cedric "
+                            + "and helps him mend his cart before the party.")
+                    .build()),
+            entry(QuestingConfig::hazeelCult, QuestDefinition.builder(QuestHelperQuest.HAZEEL_CULT)
+                    .label("Hazeel Cult")
+                    .members()
+                    .fight(20)
+                    // Always Ceril's side.
+                    .answer((ctx, options) -> options.stream()
+                            .filter(o -> o.startsWith("I won't help you")).findFirst().orElse(null))
+                    .notes("Members. Always sides with Ceril Carnillean, so the cult's leader Alomone (level 13) is "
+                            + "the only fight.")
+                    .build()),
+            entry(QuestingConfig::biohazard, QuestDefinition.builder(QuestHelperQuest.BIOHAZARD)
+                    .label("Biohazard")
+                    .members()
+                    .fight(20)
+                    .notes("Members. Needs Plague City. Distracts the mourners with the pigeons, gets the doctor's "
+                            + "gown, and takes the plague sample to Varrock; one mourner (level 13) is fought for the key.")
+                    .build()),
+            entry(QuestingConfig::towerOfLife, QuestDefinition.builder(QuestHelperQuest.TOWER_OF_LIFE)
+                    .label("Tower of Life")
+                    .members()
+                    .notes("Members. Needs 10 Construction. Builds the tower's machinery in the builders' outfit and "
+                            + "solves the pipe puzzle with Quest Helper's solver.")
+                    .build()),
+            entry(QuestingConfig::tribalTotem, QuestDefinition.builder(QuestHelperQuest.TRIBAL_TOTEM)
+                    .label("Tribal Totem")
+                    .members()
+                    .notes("Members. Needs 21 Thieving. Swaps the crate label at the Ardougne docks, enters the "
+                            + "combination on Horacio's door (Quest Helper's puzzle) and disarms the trap on the stairs.")
+                    .build()),
+            entry(QuestingConfig::deathPlateau, QuestDefinition.builder(QuestHelperQuest.DEATH_PLATEAU)
+                    .label("Death Plateau")
+                    .members()
+                    .notes("Members. Wins the IOU from Harold, places the stone balls on the stone mechanism and "
+                            + "gets the secret path to Death Plateau from Tenzing.")
+                    .build()),
+            entry(QuestingConfig::merlinsCrystal, QuestDefinition.builder(QuestHelperQuest.MERLINS_CRYSTAL)
+                    .label("Merlin's Crystal")
+                    .members()
+                    .fight(40)
+                    .minFood(10)
+                    .override(MerlinsCrystalSupport.DROP_BAT_BONES)
+                    .notes("Members. Hides in Arhein's crate to reach Keep Le Faye and fights Sir Mordred (level 39). "
+                            + "Gets Excalibur, the black candle and bat bones, drops the bones in the star to summon "
+                            + "Thrantax, and says the incantation.")
+                    .build()),
+            entry(QuestingConfig::holyGrail, QuestDefinition.builder(QuestHelperQuest.HOLY_GRAIL)
+                    .label("Holy Grail")
+                    .members()
+                    .fight(55)
+                    .minFood(15)
+                    .override(HolyGrailSupport.PREPARE_FOR_ENTRANA)
+                    .override(HolyGrailSupport.BOARD_BOAT)
+                    .override(HolyGrailSupport.WIELD_EXCALIBUR)
+                    .notes("Members. Needs Merlin's Crystal and 20 Attack. Banks all combat gear for the trip to the "
+                            + "High Priest on Entrana and boards with Take-boat. The Black Knight Titan (level 120) "
+                            + "is fought with Excalibur wielded, since only it can land the killing blow.")
+                    .build()),
+            entry(QuestingConfig::murderMystery, QuestDefinition.builder(QuestHelperQuest.MURDER_MYSTERY)
+                    .label("Murder Mystery")
+                    .members()
+                    .notes("Members. Collects the evidence at the Sinclair Mansion, matches the fingerprints and the "
+                            + "poison, and names the murderer Quest Helper works out.")
+                    .build()),
+            entry(QuestingConfig::grandTree, QuestDefinition.builder(QuestHelperQuest.THE_GRAND_TREE)
+                    .label("The Grand Tree")
+                    .members()
+                    .fight(70)
+                    .minFood(20)
+                    .notes("Members. Investigates Glough, sails to Karamja for the translation book and the twigs, "
+                            + "and fights the Black Demon (level 172) at the end; the gate is combat 70 with 20 food.")
+                    .build()),
+            entry(QuestingConfig::ragAndBoneManI, QuestDefinition.builder(QuestHelperQuest.RAG_AND_BONE_MAN_I)
+                    .label("Rag and Bone Man I")
+                    .members()
+                    .fight(20)
+                    .notes("Members. Kills a goblin, bear, ram, unicorn, giant bat and big frog for their bones, then "
+                            + "boils them in a pot of vinegar.")
                     .build()),
             entry(QuestingConfig::priestInPeril, QuestDefinition.builder(QuestHelperQuest.PRIEST_IN_PERIL)
                     .label("Priest in Peril")
@@ -293,6 +440,13 @@ public final class QuestCatalog {
                             + "Phasmatys (2 tablets, 3,500 coins a trip). Rune-Draw always draws until Robin pays up, "
                             + "the bedsheet is dyed with slime from the pool, the flag dyes are mixed as needed, and "
                             + "the rocks to the third chest are jumped one by one. The giant lobster is level 32.")
+                    .build()),
+            entry(QuestingConfig::makingHistory, QuestDefinition.builder(QuestHelperQuest.MAKING_HISTORY)
+                    .label("Making History")
+                    .members()
+                    .notes("Members. Needs Priest in Peril and The Restless Ghost. Digs up the chest in the Ardougne "
+                            + "field, takes the letter to the Outpost and the scroll to Droalak's ghost, then reports "
+                            + "to the Port Phasmatys historian.")
                     .build()),
             entry(QuestingConfig::animalMagnetism, QuestDefinition.builder(QuestHelperQuest.ANIMAL_MAGNETISM)
                     .label("Animal Magnetism")

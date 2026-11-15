@@ -285,10 +285,32 @@ public interface QuestingConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "gertrudesCat",
+            name = "Gertrude's Cat",
+            description = "Include Gertrude's Cat in the run",
+            position = 0,
+            section = membersSection
+    )
+    default boolean gertrudesCat() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "dwarfCannon",
+            name = "Dwarf Cannon",
+            description = "Include Dwarf Cannon in the run",
+            position = 1,
+            section = membersSection
+    )
+    default boolean dwarfCannon() {
+        return true;
+    }
+
+    @ConfigItem(
             keyName = "waterfallQuest",
             name = "Waterfall Quest",
             description = "Include Waterfall Quest in the run",
-            position = 0,
+            position = 2,
             section = membersSection
     )
     default boolean waterfallQuest() {
@@ -296,10 +318,66 @@ public interface QuestingConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "treeGnomeVillage",
+            name = "Tree Gnome Village",
+            description = "Include Tree Gnome Village in the run (combat 55+; the Khazard Warlord is level 112)",
+            position = 3,
+            section = membersSection
+    )
+    default boolean treeGnomeVillage() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "witchsHouse",
+            name = "Witch's House",
+            description = "Include Witch's House in the run (combat 35+; the experiment's last form is level 53)",
+            position = 4,
+            section = membersSection
+    )
+    default boolean witchsHouse() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "touristTrap",
+            name = "The Tourist Trap",
+            description = "Include The Tourist Trap in the run (needs 10 Fletching and 20 Smithing; combat 40+)",
+            position = 5,
+            section = membersSection
+    )
+    default boolean touristTrap() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "druidicRitual",
+            name = "Druidic Ritual",
+            description = "Include Druidic Ritual in the run (unlocks Herblore)",
+            position = 6,
+            section = membersSection
+    )
+    default boolean druidicRitual() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "recruitmentDrive",
+            name = "Recruitment Drive",
+            description = "Include Recruitment Drive in the run (needs Black Knights' Fortress and Druidic Ritual; "
+                    + "everything is banked before the tests)",
+            position = 7,
+            section = membersSection
+    )
+    default boolean recruitmentDrive() {
+        return true;
+    }
+
+    @ConfigItem(
             keyName = "fightArena",
             name = "Fight Arena",
             description = "Include Fight Arena in the run",
-            position = 1,
+            position = 8,
             section = membersSection
     )
     default boolean fightArena() {
@@ -307,10 +385,143 @@ public interface QuestingConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "plagueCity",
+            name = "Plague City",
+            description = "Include Plague City in the run",
+            position = 9,
+            section = membersSection
+    )
+    default boolean plagueCity() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "monksFriend",
+            name = "Monk's Friend",
+            description = "Include Monk's Friend in the run",
+            position = 10,
+            section = membersSection
+    )
+    default boolean monksFriend() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "hazeelCult",
+            name = "Hazeel Cult",
+            description = "Include Hazeel Cult in the run (always sides with Ceril)",
+            position = 11,
+            section = membersSection
+    )
+    default boolean hazeelCult() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "biohazard",
+            name = "Biohazard",
+            description = "Include Biohazard in the run (needs Plague City)",
+            position = 12,
+            section = membersSection
+    )
+    default boolean biohazard() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "towerOfLife",
+            name = "Tower of Life",
+            description = "Include Tower of Life in the run (needs 10 Construction)",
+            position = 13,
+            section = membersSection
+    )
+    default boolean towerOfLife() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "tribalTotem",
+            name = "Tribal Totem",
+            description = "Include Tribal Totem in the run (needs 21 Thieving)",
+            position = 14,
+            section = membersSection
+    )
+    default boolean tribalTotem() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "deathPlateau",
+            name = "Death Plateau",
+            description = "Include Death Plateau in the run",
+            position = 15,
+            section = membersSection
+    )
+    default boolean deathPlateau() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "merlinsCrystal",
+            name = "Merlin's Crystal",
+            description = "Include Merlin's Crystal in the run (combat 40+; Sir Mordred is level 39)",
+            position = 16,
+            section = membersSection
+    )
+    default boolean merlinsCrystal() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "holyGrail",
+            name = "Holy Grail",
+            description = "Include Holy Grail in the run (needs Merlin's Crystal and 20 Attack; combat 55+ for the "
+                    + "level 120 Black Knight Titan)",
+            position = 17,
+            section = membersSection
+    )
+    default boolean holyGrail() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "murderMystery",
+            name = "Murder Mystery",
+            description = "Include Murder Mystery in the run",
+            position = 18,
+            section = membersSection
+    )
+    default boolean murderMystery() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "grandTree",
+            name = "The Grand Tree",
+            description = "Include The Grand Tree in the run (combat 70+; the Black Demon is level 172)",
+            position = 19,
+            section = membersSection
+    )
+    default boolean grandTree() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "ragAndBoneManI",
+            name = "Rag and Bone Man I",
+            description = "Include Rag and Bone Man I in the run",
+            position = 20,
+            section = membersSection
+    )
+    default boolean ragAndBoneManI() {
+        return true;
+    }
+
+    @ConfigItem(
             keyName = "priestInPeril",
             name = "Priest in Peril",
             description = "Include Priest in Peril in the run (two level 30 fights; essence fetched in two trips)",
-            position = 2,
+            position = 21,
             section = membersSection
     )
     default boolean priestInPeril() {
@@ -321,7 +532,7 @@ public interface QuestingConfig extends Config {
             keyName = "natureSpirit",
             name = "Nature Spirit",
             description = "Include Nature Spirit in the run (needs Priest in Peril and The Restless Ghost)",
-            position = 3,
+            position = 22,
             section = membersSection
     )
     default boolean natureSpirit() {
@@ -332,10 +543,21 @@ public interface QuestingConfig extends Config {
             keyName = "ghostsAhoy",
             name = "Ghosts Ahoy",
             description = "Include Ghosts Ahoy in the run (needs Priest in Peril, The Restless Ghost, 25 Agility, 20 Cooking)",
-            position = 4,
+            position = 23,
             section = membersSection
     )
     default boolean ghostsAhoy() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "makingHistory",
+            name = "Making History",
+            description = "Include Making History in the run (needs Priest in Peril and The Restless Ghost)",
+            position = 24,
+            section = membersSection
+    )
+    default boolean makingHistory() {
         return true;
     }
 
@@ -344,7 +566,7 @@ public interface QuestingConfig extends Config {
             name = "Animal Magnetism",
             description = "Include Animal Magnetism in the run (needs Priest in Peril, Restless Ghost, Ernest the "
                     + "Chicken, 18 Slayer, 19 Crafting, 30 Ranged, 35 Woodcutting)",
-            position = 5,
+            position = 25,
             section = membersSection
     )
     default boolean animalMagnetism() {
@@ -356,7 +578,7 @@ public interface QuestingConfig extends Config {
             name = "Lost City",
             description = "Include Lost City in the run (needs 31 Crafting and 36 Woodcutting; fought with magic, "
                     + "since Entrana allows no weapons or armour; the Tree Spirit is level 101)",
-            position = 6,
+            position = 26,
             section = membersSection
     )
     default boolean lostCity() {
@@ -367,7 +589,7 @@ public interface QuestingConfig extends Config {
             keyName = "fairytaleI",
             name = "Fairytale I - Growing Pains",
             description = "Include Fairytale I in the run (needs Lost City and Nature Spirit; the Tanglefoot is level 111)",
-            position = 7,
+            position = 27,
             section = membersSection
     )
     default boolean fairytaleI() {
