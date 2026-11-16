@@ -283,6 +283,9 @@ public class QuestRunner {
             }
         }
 
+        if (usePassages(step)) {
+            return Result.RUNNING;
+        }
         if (leaveZanaris(step)) {
             return Result.RUNNING;
         }
@@ -876,6 +879,36 @@ public class QuestRunner {
         return p != null && p.getPlane() == 0 && p.getX() >= ZANARIS_MIN_X && p.getX() <= ZANARIS_MAX_X
                 && p.getY() >= ZANARIS_MIN_Y && p.getY() <= ZANARIS_MAX_Y;
     }
+
+    /**
+     * The quest's own passages (see {@link QuestPassage}): the first whose near side the player is on and whose far
+     * side holds the step's target gets the tick. This is where quests teach the runner their locked doors, crumbled
+     * walls and hedge paths, which the walker can't route through. True if one took the tick.
+     */
+    private boolean usePassages(QuestStep step) {
+        if (definition.getPassages().isEmpty()) return false;
+        WorldPoint here = Rs2Player.getWorldLocation();
+        WorldPoint target = null;
+        if (step instanceof DetailedQuestStep) {
+            DefinedPoint point = ((DetailedQuestStep) step).getDefinedPoint();
+            if (point != null) target = point.getWorldPoint();
+        }
+        for (QuestPassage passage : definition.getPassages()) {
+            if (!passage.appliesTo(ctx, here, target)) continue;
+            if (passage.run(ctx)) {
+                if (!passage.name().equals(lastPassage)) {
+                    lastPassage = passage.name();
+                    log.info("[Questing] {}: {} (step \"{}\")", definition.getLabel(), passage.name(), shortText(stepText));
+                }
+                return true;
+            }
+            return false;
+        }
+        lastPassage = null;
+        return false;
+    }
+
+    private String lastPassage;
 
     /**
      * In Zanaris with a step somewhere else: leave through the ring by the entrance. The walker plans its route

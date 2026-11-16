@@ -193,6 +193,9 @@ public class GemCrabScript extends StateMachineScript<GemCrabScript.State> {
     private long nextStyleCheckAt;
     // Boost level at which each potion is drunk next; re-rolled after every dose so it's never the same.
     private final Map<Skill, Integer> redrinkAt = new EnumMap<>(Skill.class);
+    // Earliest time to try the heart again: 7 minutes after a use, 30s after a failed one (backs up the cooldown varbit).
+    private long heartRetryAt;
+    private boolean heartMissingLogged;
 
     @Override
     protected State initialState() {
@@ -511,6 +514,7 @@ public class GemCrabScript extends StateMachineScript<GemCrabScript.State> {
         for (String potion : enabledPotions()) {
             if (BoostPotions.topUp(potion, config.potionCount())) return;
         }
+        if (withdrawHeart()) return;
 
         int missing = config.foodAmount() - foodCount();
         if (missing > 0 && !foodWithdrawTried) {
@@ -691,6 +695,7 @@ public class GemCrabScript extends StateMachineScript<GemCrabScript.State> {
                 return potion != null && drinkBoost(Skill.RANGED, potion);
             }
             case MAGIC: {
+                if (invigorateHeart()) return true;
                 String potion = config.magicPotion().itemName;
                 return potion != null && drinkBoost(Skill.MAGIC, potion);
             }
@@ -713,6 +718,65 @@ public class GemCrabScript extends StateMachineScript<GemCrabScript.State> {
         redrinkAt.put(skill, next);
         log.debug("[GemCrab] Drank {} at +{} boost; next dose at +{}", potion, at, next);
         return true;
+    }
+
+    /** The heart in use for magic, or -1 for none (or when not on magic). */
+    private int heartId() {
+        return combatKind == WeaponStyles.Kind.MAGIC ? config.magicHeart().itemId : -1;
+    }
+
+    /**
+     * Invigorates the heart once the Magic boost is down to the re-drink level and the heart is off cooldown. The
+     * cooldown comes from the game's heart timer varbit, backed by our own 7-minute timer in case the saturated heart
+     * doesn't use it. True when this tick was spent on the heart.
+     */
+    private boolean invigorateHeart() {
+        int heart = heartId();
+        if (heart < 0 || Rs2Bank.isOpen() || !Rs2Inventory.hasItem(heart)) return false;
+        long now = System.currentTimeMillis();
+        if (now < heartRetryAt || Microbot.getVarbitValue(VarbitID.IMBUED_HEART_TIMER) > 0) return false;
+        int rolled = redrinkAt.computeIfAbsent(Skill.MAGIC, s -> rollRedrinkLevel());
+        int at = Math.min(rolled, Math.max(0, heartBoost(heart) - 1));
+        if (BoostPotions.boost(Skill.MAGIC) > at) return false;
+
+        int before = Rs2Player.getBoostedSkillLevel(Skill.MAGIC);
+        Microbot.status = "Invigorating the " + config.magicHeart();
+        if (Rs2Inventory.interact(heart, "Invigorate")
+                && sleepUntil(() -> Rs2Player.getBoostedSkillLevel(Skill.MAGIC) > before, 2400)) {
+            stats.addPotion();
+            heartRetryAt = now + HEART_COOLDOWN_MS;
+            int next = rollRedrinkLevel();
+            redrinkAt.put(Skill.MAGIC, next);
+            log.debug("[GemCrab] Invigorated the {} at +{} boost; next boost at +{}", config.magicHeart(), at, next);
+        } else {
+            // Still cooling down (or the click missed): leave it a while and let the potion cover the gap.
+            heartRetryAt = now + HEART_RETRY_MS;
+        }
+        return true;
+    }
+
+    private static final long HEART_COOLDOWN_MS = TimeUnit.MINUTES.toMillis(7);
+    private static final long HEART_RETRY_MS = TimeUnit.SECONDS.toMillis(30);
+
+    /** Imbued heart: 1 + 10% of Magic. Saturated heart: 4 + 10%. */
+    private static int heartBoost(int heart) {
+        int level = Rs2Player.getRealSkillLevel(Skill.MAGIC);
+        return (heart == ItemID.SATURATED_HEART ? 4 : 1) + level / 10;
+    }
+
+    /** With the bank open, takes the heart out if it's in use and not carried. True when a withdrawal was made. */
+    private boolean withdrawHeart() {
+        int heart = heartId();
+        if (heart < 0 || Rs2Inventory.hasItem(heart)) return false;
+        if (!Rs2Bank.hasItem(heart)) {
+            if (!heartMissingLogged) {
+                heartMissingLogged = true;
+                log.info("[GemCrab] No {} in the bank; using potions only", config.magicHeart());
+            }
+            return false;
+        }
+        Microbot.status = "Withdrawing the " + config.magicHeart();
+        return Rs2Bank.withdrawOne(heart) && sleepUntil(() -> Rs2Inventory.hasItem(heart), 2400);
     }
 
     /** A random level between the configured min and max boost, inclusive (either order). */
@@ -839,6 +903,7 @@ public class GemCrabScript extends StateMachineScript<GemCrabScript.State> {
     /** Everything goes in the bank except food, the pickaxe, our potions, staminas, runes and ammo. */
     private boolean isBankable(Rs2ItemModel item) {
         if (item.isFood() || StaminaPotions.isStamina(item.getId())) return false;
+        if (item.getId() == ItemID.IMBUED_HEART || item.getId() == ItemID.SATURATED_HEART) return false;
         String name = item.getName() == null ? "" : item.getName().toLowerCase(Locale.ROOT);
         if (name.endsWith("pickaxe") || isRunesOrAmmo(name)) return false;
         for (String potion : enabledPotions()) {

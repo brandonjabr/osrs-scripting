@@ -216,9 +216,12 @@ public final class QuestCatalog {
             entry(QuestingConfig::gertrudesCat, QuestDefinition.builder(QuestHelperQuest.GERTRUDES_CAT)
                     .label("Gertrude's Cat")
                     .members()
+                    .override(GertrudesCatSupport.PICK_DOOGLE)
+                    .override(GertrudesCatSupport.SEASON_SARDINE)
                     .override(GertrudesCatSupport.SEARCH_CRATES)
-                    .notes("Members. Buys the milk, sardine and doogle leaves, and searches the Lumberyard crates in "
-                            + "turn (nearest the mewing first) until the kitten turns up.")
+                    .notes("Members. Buys the milk and sardine, picks up doogle leaves behind Gertrude's house to "
+                            + "season the sardine, and searches the Lumberyard crates in turn (nearest the mewing "
+                            + "first) until the kitten turns up.")
                     .build()),
             entry(QuestingConfig::dwarfCannon, QuestDefinition.builder(QuestHelperQuest.DWARF_CANNON)
                     .label("Dwarf Cannon")
@@ -239,8 +242,12 @@ public final class QuestCatalog {
                     .members()
                     .fight(55)
                     .minFood(15)
+                    .passage(TreeGnomeVillageSupport.CLIMB_IN)
+                    .passage(TreeGnomeVillageSupport.LADDER_DOWN)
+                    .passage(TreeGnomeVillageSupport.CLIMB_OUT)
                     .notes("Members. Through the hedge maze, logs for the gnome fortress and the ballista "
-                            + "coordinates, then the Khazard Warlord (level 112) for the last orb; the wiki suggests "
+                            + "coordinates, in and out of the Khazard tower over the crumbled wall (its door is "
+                            + "locked) for the first orb, then the Khazard Warlord (level 112) for the last orb; the wiki suggests "
                             + "safespotting him, so the gate is combat 55 with 15 food.")
                     .build()),
             entry(QuestingConfig::witchsHouse, QuestDefinition.builder(QuestHelperQuest.WITCHS_HOUSE)
@@ -248,8 +255,16 @@ public final class QuestCatalog {
                     .members()
                     .fight(35)
                     .minFood(10)
-                    .notes("Members. The key under the doormat, the cheese for the mouse hole and the magnet, then "
-                            + "the witch's experiment in four forms (levels 19, 30, 42 and 53) one after another.")
+                    .override(WitchsHouseSupport.MOUSE)
+                    .passage(WitchsHouseSupport.TO_FOUNTAIN)
+                    .passage(WitchsHouseSupport.SHED_DOOR_PASSAGE)
+                    .passage(WitchsHouseSupport.FOUNTAIN_TO_SHED)
+                    .passage(WitchsHouseSupport.HOUSE_TO_SHED)
+                    .passage(WitchsHouseSupport.OUT_WITH_THE_BALL)
+                    .notes("Members. The key under the potted plant, cheese in the mouse hole and the magnet on the "
+                            + "mouse, then round the garden's hedge paths (waiting whenever the witch is close) to "
+                            + "the fountain and the shed, and the witch's experiment in four forms (levels 19, 30, 42 "
+                            + "and 53) one after another.")
                     .build()),
             entry(QuestingConfig::touristTrap, QuestDefinition.builder(QuestHelperQuest.THE_TOURIST_TRAP)
                     .label("The Tourist Trap")

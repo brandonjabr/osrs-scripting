@@ -79,7 +79,12 @@ Quest-specific support classes handle what a generic step can't do. Some example
   kills zombies for a bronze axe, finds a safespot behind a fungus for the Tree Spirit, and teleports out. Holy Grail
   wields Excalibur for the Black Knight Titan, since only it can land the killing blow.
 - **Recruitment Drive:** banks everything worn and carried, since Sir Tiffy takes nothing into the tests.
-- **Gertrude's Cat:** searches the Lumberyard crates in turn, nearest the mewing first, until the kitten turns up.
+- **Tree Gnome Village:** passages in and out of the Khazard tower over the crumbled wall (its door is locked
+  and the walker only knows the door), and down the ladder with the orb.
+- **Witch's House:** does both halves of the mouse step (cheese in the hole, magnet on the mouse), then walks the
+  garden's hedge paths round the perimeter to the fountain, the shed and back out, holding still whenever the witch
+  is close. The route was traced on the walker's collision map.
+- **Gertrude's Cat:** picks up doogle leaves behind Gertrude's house to season the sardine, then searches the Lumberyard crates in turn, nearest the mewing first, until the kitten turns up.
 - **Fairytale I:** reads Malignius Mortifer's three random items from a varbit and buys them. It runs each farmer
   conversation itself, so the investigation can't stall.
 - **Ghosts Ahoy, Animal Magnetism, Priest in Peril, Nature Spirit, Prince Ali Rescue and Merlin's Crystal:** each
@@ -116,14 +121,15 @@ each new defender to her, wears it, and goes back in. After the rune defender it
 the dragon defender. The best defender owned is tracked across the inventory, the equipment and the bank.
 
 ### Shadowfax Gem Crab
-`scripts/shadowfaxgemcrab` · 5 files, ~2,200 lines
+`scripts/shadowfaxgemcrab` · 5 files, ~2,300 lines
 
 Fights the Gemstone Crab in Varlamore. The crab can't be killed and burrows to another mine on a timer. The script
 spots a burrow in three ways, whichever comes first: the game message, the shell appearing, or the crab vanishing.
 It then mines the shell and crawls through the cave to wherever the crab resurfaced.
 - **Melee:** balances attack styles and uses boosting potions.
-- **Ranged:** keeps the chosen ranged style.
-- **Magic:** can set the autocast spell.
+- **Ranged:** keeps the chosen ranged style and drinks ranging or bastion potions.
+- **Magic:** can set the autocast spell. It drinks magic or battlemage potions, or invigorates an imbued or saturated
+  heart, falling back to the potion while the heart's 7-minute cooldown runs.
 
 ### Shadowfax Bank Organizer
 `scripts/shadowfaxbankorganizer` · 9 files, ~1,500 lines
@@ -210,7 +216,7 @@ Takes a brand-new account through its first combat levels on the cows east of Lu
 
 | Package | What's in it |
 |---|---|
-| `util/questing` | The quest engine. `QuestRunner` plays one quest, one short action per tick. `QuestPlanner` works out what to carry and what's unmet. `QuestDefinition`, `StepOverride` and `DialogueAnswer` are the per-quest hooks. `QuestHelperBridge` and `QuestJournal` connect to Quest Helper. `MeleeGear` plans weapons and armour by level |
+| `util/questing` | The quest engine. `QuestRunner` plays one quest, one short action per tick. `QuestPlanner` works out what to carry and what's unmet. `QuestDefinition`, `StepOverride`, `QuestPassage` and `DialogueAnswer` are the per-quest hooks; a `QuestPassage` teaches the runner a quest's locked doors, crumbled walls, ladders and fixed paths (walked a few tiles at a time, waiting while a named NPC is close). `QuestHelperBridge` and `QuestJournal` connect to Quest Helper. `MeleeGear` plans weapons and armour by level |
 | `util/safety` | `StuckGuard`, the watchdog every script attaches to: no progress means log out and stop |
 | `util/misc` | `AttemptGuard`, which stops an action from being retried when the game state it should change isn't changing |
 | `util/shopping` | `ItemProcurer` buys what's missing on the GE within a budget. `ItemNeed` describes one item a script needs. `ItemPrices` reads cached prices thread-safely |
@@ -235,7 +241,7 @@ Takes a brand-new account through its first combat levels on the cows east of Lu
 
 ## Changes to Microbot
 
-`patches/microbot-core-changes.patch` holds the changes I made to 10 of Microbot's own files:
+`patches/microbot-core-changes.patch` holds the changes I made to 11 of Microbot's own files:
 
 - **NPC steps:**
   - finds a step's NPC by name when Quest Helper's ID is wrong
@@ -246,6 +252,9 @@ Takes a brand-new account through its first combat levels on the cows east of Lu
   per tick.
 - **Doors and gates:** accepts "are you sure?" warning screens on gates and dungeon entrances, instead of timing out.
 - **Mouse movement:** path-relative curve deviation that doesn't flatten short movements.
+- **Ground items:** `isDespawned()` checks whether the item is still on its tile. It used to compare despawn timers,
+  which made permanent world spawns (respawning ground spawns such as doogle leaves) look despawned, so no script
+  would pick them up.
 - **Small fixes:** in transport handling and in the Priest in Peril helper.
 
 ## Repository layout

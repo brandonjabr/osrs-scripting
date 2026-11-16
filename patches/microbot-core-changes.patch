@@ -482,3 +482,54 @@ index 6aaac03c86..6563871a2c 100644
          if (sleepUntil(Rs2Dialogue::hasSelectAnOption, 2000)) {
              Rs2Dialogue.clickOption("Yes", true);
          }
+diff --git a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/api/tileitem/models/Rs2TileItemModel.java b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/api/tileitem/models/Rs2TileItemModel.java
+index 8333ca46fc..a2dc844d6a 100644
+--- a/runelite-client/src/main/java/net/runelite/client/plugins/microbot/api/tileitem/models/Rs2TileItemModel.java
++++ b/runelite-client/src/main/java/net/runelite/client/plugins/microbot/api/tileitem/models/Rs2TileItemModel.java
+@@ -157,8 +157,14 @@ public class Rs2TileItemModel implements TileItem, IEntity {
+         });
+     }
+ 
++    /**
++     * Whether a dropped item's despawn timer runs out within {@code ticks}. Permanent world spawns (respawning ground
++     * spawns such as doogle leaves) have no running timer: their despawn tick is already in the past, so they never
++     * count as about to despawn.
++     */
+     public boolean willDespawnWithin(int ticks) {
+-        return getDespawnTime() - Microbot.getClient().getTickCount() <= ticks;
++        int left = getDespawnTime() - Microbot.getClient().getTickCount();
++        return left > 0 && left <= ticks;
+     }
+ 
+     public boolean isLootAble() {
+@@ -169,9 +175,28 @@ public class Rs2TileItemModel implements TileItem, IEntity {
+         return tileItem.getOwnership() == TileItem.OWNERSHIP_SELF;
+     }
+ 
++    /**
++     * True once this item is no longer on its tile (picked up, despawned, or the scene reloaded).
++     * <p>
++     * This used to compare the despawn tick against the current tick. Permanent world spawns (respawning ground
++     * spawns: doogle leaves, quest items lying in the world) report a despawn tick that is already in the past (see
++     * RuneLite's GroundItemsOverlay, "that's weird"), so every one of them read as despawned while lying in plain
++     * sight, and every {@code !isDespawned()} filter (quest looting, script looting) skipped them. Checking the tile
++     * itself is right for dropped items and world spawns alike.
++     */
+     public boolean isDespawned() {
+-        int despawnTime = getDespawnTime();
+-        return despawnTime != -1 && despawnTime <= Microbot.getClient().getTickCount();
++        if (tile == null) return true;
++        if (Microbot.getClient().isClientThread()) return !onTile();
++        return !Microbot.getClientThread().runOnClientThreadOptional(this::onTile).orElse(false);
++    }
++
++    private boolean onTile() {
++        java.util.List<TileItem> items = tile.getGroundItems();
++        if (items == null) return false;
++        for (TileItem item : items) {
++            if (item == tileItem) return true;
++        }
++        return false;
+     }
+ 
+     public int getTotalGeValue() {

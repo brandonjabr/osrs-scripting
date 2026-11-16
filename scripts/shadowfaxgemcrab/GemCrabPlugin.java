@@ -18,15 +18,15 @@ import javax.inject.Inject;
 @PluginDescriptor(
         name = PluginDescriptor.Default + "Shadowfax Gem Crab",
         description = "Fights the Gemstone Crab with melee, ranged or magic, mines its shell and follows it through the "
-                + "caves; boosting potions, balanced melee styles, ranged styles and autocast",
-        tags = {"gem", "gemstone", "crab", "varlamore", "tlati", "combat", "afk", "ranged", "magic", "microbot"},
+                + "caves; boosting potions, imbued and saturated hearts, balanced melee styles, ranged styles and autocast",
+        tags = {"gem", "gemstone", "crab", "varlamore", "tlati", "combat", "afk", "ranged", "magic", "imbued heart", "microbot"},
         version = GemCrabPlugin.VERSION,
         enabledByDefault = false
 )
 @Slf4j
 public class GemCrabPlugin extends Plugin {
 
-    static final String VERSION = "1.1.0";
+    static final String VERSION = "1.2.0";
 
     @Inject
     private GemCrabScript script;

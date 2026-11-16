@@ -148,7 +148,7 @@ public class GemCrabOverlay extends Overlay {
                 {"GEM VALUE", formatGp(stats.gemValue())},
                 {"GP / HR", formatGp(stats.perHour(stats.gemValue()))},
                 {"TUNNELS", formatNumber(stats.tunnels())},
-                {"POTIONS", formatNumber(stats.potions())},
+                {"BOOSTS", formatNumber(stats.potions())},
                 {"BANK TRIPS", formatNumber(stats.bankTrips())},
         };
 

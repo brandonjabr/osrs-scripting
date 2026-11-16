@@ -1,5 +1,6 @@
 package net.runelite.client.plugins.microbot.shadowfaxgemcrab;
 
+import net.runelite.api.gameval.ItemID;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -101,6 +102,25 @@ public interface GemCrabConfig extends Config {
         MagicPotion(String label, String itemName) {
             this.label = label;
             this.itemName = itemName;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    enum MagicHeart {
+        NONE("None", -1),
+        IMBUED("Imbued heart", ItemID.IMBUED_HEART),
+        SATURATED("Saturated heart", ItemID.SATURATED_HEART);
+
+        private final String label;
+        final int itemId;
+
+        MagicHeart(String label, int itemId) {
+            this.label = label;
+            this.itemId = itemId;
         }
 
         @Override
@@ -358,6 +378,19 @@ public interface GemCrabConfig extends Config {
         return MagicPotion.MAGIC;
     }
 
+    @ConfigItem(
+            keyName = "magicHeart",
+            name = "Magic: heart",
+            description = "Magic only: invigorate an imbued or saturated heart whenever the Magic boost runs low and "
+                    + "the heart is off its 7-minute cooldown. Taken from the bank and never deposited. While the "
+                    + "heart is cooling down, the magic potion above (if any) is drunk instead",
+            position = 4,
+            section = potionSection
+    )
+    default MagicHeart magicHeart() {
+        return MagicHeart.NONE;
+    }
+
     @Range(min = 0, max = 20)
     @ConfigItem(
             keyName = "redrinkMinBoost",
@@ -365,7 +398,7 @@ public interface GemCrabConfig extends Config {
             description = "Drink again once the boost (boosted minus real level) is down to a level picked at "
                     + "random between this and the max. A new level is picked after every dose. Never above what "
                     + "one dose gives, so a small boost (a magic potion's +4) isn't drunk back to back",
-            position = 4,
+            position = 5,
             section = potionSection
     )
     default int redrinkMinBoost() {
@@ -377,7 +410,7 @@ public interface GemCrabConfig extends Config {
             keyName = "redrinkMaxBoost",
             name = "Re-drink at boost (max)",
             description = "Upper end of the random re-drink level",
-            position = 5,
+            position = 6,
             section = potionSection
     )
     default int redrinkMaxBoost() {
@@ -389,7 +422,7 @@ public interface GemCrabConfig extends Config {
             keyName = "potionCount",
             name = "Potions to carry",
             description = "How many of each potion in use to take from the bank on each trip",
-            position = 6,
+            position = 7,
             section = potionSection
     )
     default int potionCount() {

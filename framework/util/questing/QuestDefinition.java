@@ -28,6 +28,7 @@ public final class QuestDefinition {
     private final Set<Integer> skippedItems;
     private final Map<Integer, ItemNeed> substitutes;
     private final List<StepOverride> overrides;
+    private final List<QuestPassage> passages;
     private final List<DialogueAnswer> answers;
     private final String notes;
     private final boolean gatherInGame;
@@ -45,6 +46,7 @@ public final class QuestDefinition {
         this.skippedItems = Collections.unmodifiableSet(new HashSet<>(b.skippedItems));
         this.substitutes = Collections.unmodifiableMap(new HashMap<>(b.substitutes));
         this.overrides = Collections.unmodifiableList(new ArrayList<>(b.overrides));
+        this.passages = Collections.unmodifiableList(new ArrayList<>(b.passages));
         this.answers = Collections.unmodifiableList(new ArrayList<>(b.answers));
         this.notes = b.notes;
         this.gatherInGame = b.gatherInGame;
@@ -94,6 +96,11 @@ public final class QuestDefinition {
         return overrides;
     }
 
+    /** Quest-specific doors, walls, ladders and paths; see {@link QuestPassage}. */
+    public List<QuestPassage> getPassages() {
+        return passages;
+    }
+
     public List<DialogueAnswer> getAnswers() {
         return answers;
     }
@@ -135,6 +142,7 @@ public final class QuestDefinition {
         private final Set<Integer> skippedItems = new HashSet<>();
         private final Map<Integer, ItemNeed> substitutes = new HashMap<>();
         private final List<StepOverride> overrides = new ArrayList<>();
+        private final List<QuestPassage> passages = new ArrayList<>();
         private final List<DialogueAnswer> answers = new ArrayList<>();
         private String notes = "";
         private boolean gatherInGame;
@@ -193,6 +201,12 @@ public final class QuestDefinition {
 
         public Builder override(StepOverride override) {
             overrides.add(override);
+            return this;
+        }
+
+        /** A quest-specific way through a door, wall, ladder or fixed path; the first that applies gets the tick. */
+        public Builder passage(QuestPassage passage) {
+            passages.add(passage);
             return this;
         }
 
